@@ -32,6 +32,13 @@ function textResult(obj) {
   };
 }
 
+function errorResult(message) {
+  return {
+    content: [{ type: 'text', text: message }],
+    isError: true
+  };
+}
+
 function normalize(s = '') {
   return s.toString().trim().toLowerCase();
 }
@@ -79,10 +86,26 @@ function resolveBookingDate(date_type, exact_date) {
   return null;
 }
 
+function findBookingById(booking_id) {
+  return bookings.find(
+    b => b.booking_id === booking_id
+  );
+}
+
+function isSlotOccupied(date, time, excludeBookingId = null) {
+  return bookings.some(
+    b =>
+      b.booking_id !== excludeBookingId &&
+      b.date === date &&
+      b.time === time &&
+      b.status === 'confirmed'
+  );
+}
+
 function createServer() {
   const server = new McpServer({
     name: 'yeti-nail-studio-demo',
-    version: '1.1.0'
+    version: '1.2.0'
   });
 
   server.registerTool(
@@ -119,7 +142,7 @@ function createServer() {
     'check_available_slots',
     {
       description:
-        'Check available appointment times for a requested date. Use this before creating a booking. For relative dates, pass today or tomorrow instead of calculating the calendar date yourself.',
+        'Check available appointment times for a requested date. Use before creating or rescheduling a booking. For relative dates, pass today or tomorrow instead of calculating the calendar date yourself.',
       inputSchema: z.object({
         date_type: z
           .enum(['today', 'tomorrow', 'exact'])
@@ -145,30 +168,26 @@ function createServer() {
           .describe('Optional preferred part of day')
       })
     },
-    async ({ service_id, date_type, exact_date, time_of_day }) => {
-      const date = resolveBookingDate(date_type, exact_date);
+
+    async ({
+      service_id,
+      date_type,
+      exact_date,
+      time_of_day
+    }) => {
+      const date = resolveBookingDate(
+        date_type,
+        exact_date
+      );
 
       if (!date) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text:
-                'Invalid appointment date. Use today, tomorrow, or an explicit YYYY-MM-DD date.'
-            }
-          ],
-          isError: true
-        };
+        return errorResult(
+          'Invalid appointment date. Use today, tomorrow, or an explicit YYYY-MM-DD date.'
+        );
       }
 
       let slots = defaultSlots.filter(
-        time =>
-          !bookings.some(
-            b =>
-              b.date === date &&
-              b.time === time &&
-              b.status === 'confirmed'
-          )
+        time => !isSlotOccupied(date, time)
       );
 
       if (time_of_day === 'morning') {
@@ -176,7 +195,9 @@ function createServer() {
       }
 
       if (time_of_day === 'afternoon') {
-        slots = slots.filter(t => t >= '12:00' && t < '18:00');
+        slots = slots.filter(
+          t => t >= '12:00' && t < '18:00'
+        );
       }
 
       if (time_of_day === 'evening') {
@@ -195,13 +216,15 @@ function createServer() {
     'create_booking',
     {
       description:
-        'Create a salon appointment only after the user has clearly confirmed the service, date, time, and customer name. For relative dates, pass today or tomorrow and do not calculate the calendar date yourself. Return success only when the booking is actually created.',
+        'Create a NEW salon appointment only after the user has clearly confirmed service, date, time, and customer name. Do NOT use this tool to move, change, reschedule, or cancel an existing booking. For a change use get_customer_bookings then reschedule_booking. For cancellation use get_customer_bookings then cancel_booking. For relative dates, pass today or tomorrow and do not calculate the calendar date yourself. Return success only when the booking is actually created.',
 
       inputSchema: z.object({
         customer_name: z
           .string()
           .min(1)
-          .describe('Customer name exactly as the user provided it'),
+          .describe(
+            'Customer name exactly as the user provided it'
+          ),
 
         service_id: z
           .string()
@@ -224,7 +247,9 @@ function createServer() {
         time: z
           .string()
           .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
-          .describe('Appointment time in HH:MM format')
+          .describe(
+            'Appointment time in HH:MM format'
+          )
       })
     },
 
@@ -235,19 +260,15 @@ function createServer() {
       exact_date,
       time
     }) => {
-      const date = resolveBookingDate(date_type, exact_date);
+      const date = resolveBookingDate(
+        date_type,
+        exact_date
+      );
 
       if (!date) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text:
-                'Invalid appointment date. Use today, tomorrow, or an explicit YYYY-MM-DD date.'
-            }
-          ],
-          isError: true
-        };
+        return errorResult(
+          'Invalid appointment date. Use today, tomorrow, or an explicit YYYY-MM-DD date.'
+        );
       }
 
       const service = services.find(
@@ -255,54 +276,28 @@ function createServer() {
       );
 
       if (!service) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text:
-                'Unknown service_id. Call get_services first.'
-            }
-          ],
-          isError: true
-        };
+        return errorResult(
+          'Unknown service_id. Call get_services first.'
+        );
       }
 
       if (!defaultSlots.includes(time)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Time ${time} is not an offered slot.`
-            }
-          ],
-          isError: true
-        };
+        return errorResult(
+          `Time ${time} is not an offered slot.`
+        );
       }
 
-      const occupied = bookings.some(
-        b =>
-          b.date === date &&
-          b.time === time &&
-          b.status === 'confirmed'
-      );
-
-      if (occupied) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text:
-                `Slot ${date} ${time} is no longer available. ` +
-                'Call check_available_slots again.'
-            }
-          ],
-          isError: true
-        };
+      if (isSlotOccupied(date, time)) {
+        return errorResult(
+          `Slot ${date} ${time} is no longer available. Call check_available_slots again.`
+        );
       }
 
       const booking = {
         booking_id:
-          `BK-${randomUUID().slice(0, 8).toUpperCase()}`,
+          `BK-${randomUUID()
+            .slice(0, 8)
+            .toUpperCase()}`,
 
         customer_name,
         service_id,
@@ -311,12 +306,211 @@ function createServer() {
         time,
         price_kzt: service.price_kzt,
         status: 'confirmed',
-        created_at: new Date().toISOString()
+
+        created_at: new Date().toISOString(),
+        updated_at: null,
+        cancelled_at: null
       };
 
       bookings.push(booking);
 
       return textResult(booking);
+    }
+  );
+
+  server.registerTool(
+    'get_customer_bookings',
+    {
+      description:
+        'Find existing salon bookings for a customer. Use this BEFORE rescheduling or cancelling when the user refers to my booking, my appointment, move my appointment, change the time, or cancel my appointment. Use the returned booking_id with reschedule_booking or cancel_booking.',
+
+      inputSchema: z.object({
+        customer_name: z
+          .string()
+          .min(1)
+          .describe(
+            'Customer name exactly as known from the conversation'
+          ),
+
+        status: z
+          .enum(['confirmed', 'cancelled', 'all'])
+          .optional()
+          .describe(
+            'Default confirmed. Use all only when history is needed.'
+          )
+      })
+    },
+
+    async ({
+      customer_name,
+      status = 'confirmed'
+    }) => {
+      const q = normalize(customer_name);
+
+      let list = bookings.filter(
+        b => normalize(b.customer_name) === q
+      );
+
+      if (status !== 'all') {
+        list = list.filter(
+          b => b.status === status
+        );
+      }
+
+      return textResult({
+        customer_name,
+        bookings: list
+      });
+    }
+  );
+
+  server.registerTool(
+    'reschedule_booking',
+    {
+      description:
+        'Move an EXISTING confirmed booking to a new date and/or time while keeping the same booking_id. Always use get_customer_bookings first to obtain the correct booking_id. Do NOT create a second booking when the user asks to move, change, or reschedule an appointment.',
+
+      inputSchema: z.object({
+        booking_id: z
+          .string()
+          .min(1)
+          .describe(
+            'Existing booking id returned by get_customer_bookings'
+          ),
+
+        new_date_type: z
+          .enum(['today', 'tomorrow', 'exact'])
+          .describe(
+            'Use today for сегодня, tomorrow for завтра, and exact only when the user explicitly gives a calendar date.'
+          ),
+
+        new_exact_date: z
+          .string()
+          .optional()
+          .describe(
+            'YYYY-MM-DD only when new_date_type is exact. Leave empty for today or tomorrow.'
+          ),
+
+        new_time: z
+          .string()
+          .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+          .describe(
+            'New appointment time in HH:MM format'
+          )
+      })
+    },
+
+    async ({
+      booking_id,
+      new_date_type,
+      new_exact_date,
+      new_time
+    }) => {
+      const booking =
+        findBookingById(booking_id);
+
+      if (!booking) {
+        return errorResult(
+          'Unknown booking_id. Call get_customer_bookings first.'
+        );
+      }
+
+      if (booking.status !== 'confirmed') {
+        return errorResult(
+          `Booking ${booking_id} is not active and cannot be rescheduled.`
+        );
+      }
+
+      const newDate = resolveBookingDate(
+        new_date_type,
+        new_exact_date
+      );
+
+      if (!newDate) {
+        return errorResult(
+          'Invalid new appointment date. Use today, tomorrow, or an explicit YYYY-MM-DD date.'
+        );
+      }
+
+      if (!defaultSlots.includes(new_time)) {
+        return errorResult(
+          `Time ${new_time} is not an offered slot.`
+        );
+      }
+
+      if (
+        isSlotOccupied(
+          newDate,
+          new_time,
+          booking_id
+        )
+      ) {
+        return errorResult(
+          `Slot ${newDate} ${new_time} is already occupied. Call check_available_slots again.`
+        );
+      }
+
+      const previous = {
+        date: booking.date,
+        time: booking.time
+      };
+
+      booking.date = newDate;
+      booking.time = new_time;
+      booking.updated_at =
+        new Date().toISOString();
+
+      return textResult({
+        action: 'rescheduled',
+        previous,
+        booking
+      });
+    }
+  );
+
+  server.registerTool(
+    'cancel_booking',
+    {
+      description:
+        'Cancel an EXISTING confirmed salon booking. Always use get_customer_bookings first to obtain the correct booking_id when the user says cancel my appointment, remove my booking, or I cannot come. Do not tell the user to contact an administrator when this tool can perform the cancellation.',
+
+      inputSchema: z.object({
+        booking_id: z
+          .string()
+          .min(1)
+          .describe(
+            'Existing booking id returned by get_customer_bookings'
+          )
+      })
+    },
+
+    async ({ booking_id }) => {
+      const booking =
+        findBookingById(booking_id);
+
+      if (!booking) {
+        return errorResult(
+          'Unknown booking_id. Call get_customer_bookings first.'
+        );
+      }
+
+      if (booking.status === 'cancelled') {
+        return errorResult(
+          `Booking ${booking_id} is already cancelled.`
+        );
+      }
+
+      booking.status = 'cancelled';
+      booking.cancelled_at =
+        new Date().toISOString();
+
+      booking.updated_at =
+        booking.cancelled_at;
+
+      return textResult({
+        action: 'cancelled',
+        booking
+      });
     }
   );
 
@@ -338,11 +532,16 @@ function createServer() {
           .number()
           .positive()
           .optional()
-          .describe('Optional maximum price in KZT')
+          .describe(
+            'Optional maximum price in KZT'
+          )
       })
     },
 
-    async ({ query, max_price_kzt }) => {
+    async ({
+      query,
+      max_price_kzt
+    }) => {
       const q = normalize(query);
 
       let list = products.filter(
@@ -359,17 +558,19 @@ function createServer() {
 
         list = products.filter(
           p =>
-            terms.some(term =>
-              normalize(
-                `${p.name} ${p.category}`
-              ).includes(term)
+            terms.some(
+              term =>
+                normalize(
+                  `${p.name} ${p.category}`
+                ).includes(term)
             )
         );
       }
 
       if (max_price_kzt !== undefined) {
         list = list.filter(
-          p => p.price_kzt <= max_price_kzt
+          p =>
+            p.price_kzt <= max_price_kzt
         );
       }
 
@@ -390,26 +591,22 @@ function createServer() {
         product_id: z
           .string()
           .min(1)
-          .describe('Product id from search_products')
+          .describe(
+            'Product id from search_products'
+          )
       })
     },
 
     async ({ product_id }) => {
-      const product = products.find(
-        p => p.id === product_id
-      );
+      const product =
+        products.find(
+          p => p.id === product_id
+        );
 
       if (!product) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text:
-                'Unknown product_id. Call search_products first.'
-            }
-          ],
-          isError: true
-        };
+        return errorResult(
+          'Unknown product_id. Call search_products first.'
+        );
       }
 
       return textResult({
@@ -427,7 +624,8 @@ const handler = createMcpHandler(
   () => createServer()
 );
 
-const nodeHandler = toNodeHandler(handler);
+const nodeHandler =
+  toNodeHandler(handler);
 
 const host = '0.0.0.0';
 
@@ -436,20 +634,24 @@ const allowedHosts = [
   '127.0.0.1'
 ];
 
-if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+if (
+  process.env.RENDER_EXTERNAL_HOSTNAME
+) {
   allowedHosts.push(
     process.env.RENDER_EXTERNAL_HOSTNAME
   );
 }
 
-const app = createMcpFastifyApp({
-  host,
-  allowedHosts
-});
+const app =
+  createMcpFastifyApp({
+    host,
+    allowedHosts
+  });
 
 app.get('/', async () => ({
   ok: true,
   service: 'Yeti Nail Studio MCP Demo',
+  version: '1.2.0',
   mcp_endpoint: '/mcp',
   demo_bookings: '/bookings'
 }));
@@ -462,13 +664,12 @@ app.get('/bookings', async () => ({
 
 app.all(
   '/mcp',
-  async (request, reply) => {
-    return nodeHandler(
+  async (request, reply) =>
+    nodeHandler(
       request.raw,
       reply.raw,
       request.body
-    );
-  }
+    )
 );
 
 const port = Number(
