@@ -34,6 +34,51 @@ function normalize(s = '') {
   return s.toString().trim().toLowerCase();
 }
 
+const BUSINESS_TIME_ZONE = 'Asia/Almaty';
+
+function getBusinessDate(offsetDays = 0) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+
+  const values = Object.fromEntries(
+    parts.map(part => [part.type, part.value])
+  );
+
+  const date = new Date(
+    Date.UTC(
+      Number(values.year),
+      Number(values.month) - 1,
+      Number(values.day) + offsetDays
+    )
+  );
+
+  return date.toISOString().slice(0, 10);
+}
+
+function resolveBookingDate(date_type, exact_date) {
+  if (date_type === 'today') {
+    return getBusinessDate(0);
+  }
+
+  if (date_type === 'tomorrow') {
+    return getBusinessDate(1);
+  }
+
+  if (
+    date_type === 'exact' &&
+    exact_date &&
+    /^\d{4}-\d{2}-\d{2}$/.test(exact_date)
+  ) {
+    return exact_date;
+  }
+
+  return null;
+}
+
 function createServer() {
   const server = new McpServer({ name: 'yeti-nail-studio-demo', version: '1.0.0' });
 
@@ -57,12 +102,28 @@ function createServer() {
     {
       description: 'Check available appointment times for a requested date. Use before creating a booking.',
       inputSchema: z.object({
-        date: z.string().describe('Appointment date in YYYY-MM-DD format'),
+        date_type: z.enum(['today', 'tomorrow', 'exact']).describe(
+  'Interpret the date exactly as the user requested. If the user says today/сегодня use today. If the user says tomorrow/завтра use tomorrow. NEVER calculate a relative date yourself. Use exact only when the user explicitly gives a calendar date.'
+),
+exact_date: z.string().optional().describe(
+  'YYYY-MM-DD only when date_type is exact. Leave empty for today or tomorrow.'
+),
         service_id: z.string().optional().describe('Optional service id'),
         time_of_day: z.enum(['morning', 'afternoon', 'evening']).optional().describe('Optional preferred part of day')
       })
     },
-    async ({ date, service_id, time_of_day }) => {
+    async ({ customer_name, service_id, date_type, exact_date, time }) => {
+      const date = resolveBookingDate(date_type, exact_date);
+
+if (!date) {
+  return {
+    content: [{
+      type: 'text',
+      text: 'Invalid appointment date. Use today, tomorrow, or an explicit YYYY-MM-DD date.'
+    }],
+    isError: true
+  };
+}
       let slots = defaultSlots.filter(time => !bookings.some(b => b.date === date && b.time === time && b.status === 'confirmed'));
       if (time_of_day === 'morning') slots = slots.filter(t => t < '12:00');
       if (time_of_day === 'afternoon') slots = slots.filter(t => t >= '12:00' && t < '18:00');
