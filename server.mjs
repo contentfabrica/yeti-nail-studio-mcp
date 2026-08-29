@@ -79,7 +79,7 @@ function createServer() {
         customer_name: z.string().min(1).describe('Customer name'),
         service_id: z.string().min(1).describe('Service id from get_services'),
         date: z.string().describe('Appointment date in YYYY-MM-DD format'),
-        time: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).describe('Appointment time in HH:MM format')
+        time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).describe('Appointment time in HH:MM format')
       })
     },
     async ({ customer_name, service_id, date, time }) => {
