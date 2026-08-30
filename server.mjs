@@ -2189,37 +2189,28 @@ function humanDate(value) {
     return parts[2] + '.' + parts[1] + '.' + parts[0];
 }
 
-const UI_FLASH_MS = 6500;
-
-let uiTrackerReady = false;
-let lastUiEventSeq = 0;
-let uiFlashUntil = 0;
-
-function syncUiAction(ui) {
-    const seq = Number(
-        ui && ui.event_seq
-            ? ui.event_seq
-            : 0
-    );
-
-    if (!uiTrackerReady) {
-        lastUiEventSeq = seq;
-        uiTrackerReady = true;
-        return;
-    }
-
-    if (seq !== lastUiEventSeq) {
-        lastUiEventSeq = seq;
-        uiFlashUntil =
-            Date.now() +
-            UI_FLASH_MS;
-    }
-}
+const UI_FLASH_MS = 7000;
 
 function actionIsFresh(ui) {
+    if (
+        !ui ||
+        !ui.last_action_at
+    ) {
+        return false;
+    }
+
+    const actionTime =
+        new Date(
+            ui.last_action_at
+        ).getTime();
+
+    const age =
+        Date.now() -
+        actionTime;
+
     return (
-        Boolean(ui) &&
-        Date.now() < uiFlashUntil
+        age >= -5000 &&
+        age < UI_FLASH_MS
     );
 }
 
@@ -2670,10 +2661,6 @@ async function refresh() {
 
         const data =
             await response.json();
-
-        syncUiAction(
-            data.ui
-        );
 
         renderServices(
             data
