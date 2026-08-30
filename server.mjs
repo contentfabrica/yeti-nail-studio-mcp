@@ -231,7 +231,7 @@ function createServer() {
     'get_services',
     {
       description:
-        'Get salon services, prices in KZT, and duration. Use this when the user asks what services are available or how much a service costs.',
+  'ALWAYS call this tool whenever the user asks about salon services, service availability, service names, categories, prices, durations, manicure, pedicure, nail design, or asks what services are offered. Do not answer these questions from memory or previous conversation context. Always retrieve the current service data with this tool first.',
 
       inputSchema: z.object({
         category: z
@@ -258,7 +258,7 @@ function createServer() {
   'services_loaded',
   'services',
   {
-    service_ids: services.map(
+    service_ids: list.map(
       s => s.id
     )
   }
