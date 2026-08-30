@@ -30,7 +30,8 @@ const uiState = {
   focus: null,
   selected_date: null,
   touched_booking_id: null,
-  product_ids: []
+product_ids: [],
+service_ids: []
 };
 
 function textResult(obj) {
@@ -67,6 +68,9 @@ function markUi(action, focus, payload = {}) {
   if (payload.product_ids !== undefined) {
     uiState.product_ids = payload.product_ids;
   }
+  if (payload.service_ids !== undefined) {
+  uiState.service_ids = payload.service_ids;
+}
 }
 
 function getBusinessDate(offsetDays = 0) {
@@ -251,9 +255,14 @@ function createServer() {
         : services;
 
       markUi(
-        'services_loaded',
-        'services'
-      );
+  'services_loaded',
+  'services',
+  {
+    service_ids: services.map(
+      s => s.id
+    )
+  }
+);
 
       return textResult({
         currency: 'KZT',
@@ -1638,6 +1647,36 @@ const DEMO_HTML = `<!doctype html>
   transform: translateX(-3px) scale(1.012);
 }
 
+.service.highlight {
+  border-color: rgba(255, 79, 157, .98);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 79, 157, .16),
+      rgba(143, 99, 255, .12)
+    );
+
+  box-shadow:
+    0 0 0 1px rgba(255, 79, 157, .28),
+    0 0 28px rgba(255, 79, 157, .52),
+    0 0 52px rgba(143, 99, 255, .28);
+
+  transform: translateX(3px) scale(1.015);
+
+  animation: servicePulse .85s ease-in-out 3;
+}
+
+@keyframes servicePulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.28);
+  }
+}
+
     .icon {
       width:
         42px;
@@ -2422,9 +2461,19 @@ const DEMO_HTML = `<!doctype html>
         .innerHTML =
         data.services
           .map(
-            function(item) {
-              return (
-                '<div class="service">' +
+  function(item) {
+
+    const highlighted =
+      actionIsFresh(data.ui) &&
+      data.ui &&
+      data.ui.focus === 'services' &&
+      Array.isArray(data.ui.service_ids) &&
+      data.ui.service_ids.includes(item.id);
+
+    return (
+      '<div class="service' +
+      (highlighted ? ' highlight' : '') +
+      '">' +
 
                 '<div class="icon">' +
                 serviceIcon(
