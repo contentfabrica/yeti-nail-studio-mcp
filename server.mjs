@@ -3262,6 +3262,23 @@ setInterval(
 </body>
 </html>`;
 
+const DEMO_SCREEN_HTML =
+  DEMO_HTML.replace(
+    '</head>',
+    `
+<style>
+  html,
+  body {
+    background: transparent !important;
+  }
+
+  body {
+    padding: 14px !important;
+  }
+</style>
+</head>`
+  );
+
 const handler =
   createMcpHandler(
     () => createServer()
@@ -3402,6 +3419,25 @@ app.get(
     );
 
     return DEMO_HTML;
+  }
+);
+
+app.get(
+  '/demo-screen',
+  async (
+    request,
+    reply
+  ) => {
+    reply.header(
+      'Cache-Control',
+      'no-store'
+    );
+
+    reply.type(
+      'text/html; charset=utf-8'
+    );
+
+    return DEMO_SCREEN_HTML;
   }
 );
 
