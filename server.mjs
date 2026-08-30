@@ -1487,20 +1487,26 @@ const DEMO_HTML = `<!doctype html>
     }
 
     .panel.glow {
-      border-color:
-        rgba(255,79,157,.78);
+  border-color: rgba(255,79,157,.98);
+  box-shadow:
+    0 0 0 2px rgba(255,79,157,.34),
+    0 0 34px rgba(255,79,157,.58),
+    0 0 78px rgba(143,99,255,.32),
+    0 18px 55px rgba(0,0,0,.32);
 
-      box-shadow:
-        0 0 0 1px
-        rgba(255,79,157,.2),
-        0 0 34px
-        rgba(255,79,157,.22),
-        0 18px 55px
-        rgba(0,0,0,.28);
+  transform: translateY(-2px) scale(1.006);
+  animation: panelPulse 1.05s ease-in-out 2;
+}
 
-      transform:
-        translateY(-1px);
-    }
+@keyframes panelPulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.24);
+  }
+}
 
     .panel-title {
       display:
@@ -1530,26 +1536,53 @@ const DEMO_HTML = `<!doctype html>
         .02em;
     }
 
-    .date-chip {
-      color:
-        #c7cbe0;
+   .date-chip {
+  color: #c7cbe0;
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.035);
 
-      font-size:
-        12px;
+  transition:
+    color .2s ease,
+    background .2s ease,
+    border-color .2s ease,
+    box-shadow .2s ease,
+    transform .2s ease;
+}
 
-      padding:
-        7px 10px;
+.date-chip.date-flash {
+  color: #ffffff;
 
-      border-radius:
-        10px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,79,157,.42),
+      rgba(143,99,255,.42)
+    );
 
-      border:
-        1px solid
-        var(--line);
+  border-color: rgba(255,126,190,.98);
 
-      background:
-        rgba(255,255,255,.035);
-    }
+  box-shadow:
+    0 0 0 2px rgba(255,79,157,.28),
+    0 0 30px rgba(255,79,157,.78),
+    0 0 58px rgba(143,99,255,.50);
+
+  transform: scale(1.10);
+
+  animation: datePulse .85s ease-in-out 3;
+}
+
+@keyframes datePulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.42);
+  }
+}
 
     .list {
       display:
@@ -1595,15 +1628,15 @@ const DEMO_HTML = `<!doctype html>
     }
 
     .product.highlight {
-      border-color:
-        rgba(255,79,157,.78);
+  border-color: rgba(255,79,157,.98);
+  background: rgba(255,79,157,.14);
 
-      background:
-        rgba(255,79,157,.08);
+  box-shadow:
+    0 0 0 1px rgba(255,79,157,.24),
+    0 0 30px rgba(255,79,157,.46);
 
-      transform:
-        translateX(-2px);
-    }
+  transform: translateX(-3px) scale(1.012);
+}
 
     .icon {
       width:
@@ -1739,6 +1772,14 @@ const DEMO_HTML = `<!doctype html>
       border-color:
         rgba(255,106,116,.30);
     }
+
+.slot.changed {
+  box-shadow:
+    0 0 0 2px rgba(143,99,255,.30),
+    0 0 30px rgba(143,99,255,.58);
+
+  transform: scale(1.06);
+}
 
     .slot small {
       color:
@@ -2315,7 +2356,7 @@ const DEMO_HTML = `<!doctype html>
         new Date(
           ui.last_action_at
         ).getTime()
-      ) < 1800;
+      ) < 2600;
     }
 
     function setGlow(
@@ -2420,58 +2461,90 @@ const DEMO_HTML = `<!doctype html>
           .join('');
     }
 
-    function renderSlots(
-      data
-    ) {
-      document
-        .getElementById(
-          'displayDate'
-        )
-        .textContent =
-        humanDate(
-          data.display_date
-        );
+    let previousDisplayDate = null;
+let previousSlotState = new Map();
+let slotFlashUntil = new Map();
 
-      document
-        .getElementById(
-          'slots'
-        )
-        .innerHTML =
-        data.slots
-          .map(
-            function(slot) {
-              return (
-                '<div class="slot ' +
-                (
-                  slot.occupied
-                    ? 'busy'
-                    : 'free'
-                ) +
-                '">' +
+function flashDateIfChanged(newDate) {
+  const chip =
+    document.getElementById('displayDate');
 
-                '<div>' +
-                esc(
-                  slot.time
-                ) +
-                '</div>' +
+  if (
+    previousDisplayDate !== null &&
+    previousDisplayDate !== newDate
+  ) {
+    chip.classList.remove('date-flash');
 
-                '<small>' +
-                (
-                  slot.occupied
-                    ? esc(
-                        slot.customer_name ||
-                        'Занято'
-                      )
-                    : 'Свободно'
-                ) +
-                '</small>' +
+    void chip.offsetWidth;
 
-                '</div>'
-              );
-            }
-          )
-          .join('');
-    }
+    chip.classList.add('date-flash');
+
+    setTimeout(function() {
+      chip.classList.remove('date-flash');
+    }, 2600);
+  }
+
+  previousDisplayDate = newDate;
+}
+
+function renderSlots(data) {
+  const chip =
+    document.getElementById('displayDate');
+
+  chip.textContent =
+    humanDate(data.display_date);
+
+  flashDateIfChanged(
+    data.display_date
+  );
+
+  document.getElementById('slots').innerHTML =
+    data.slots.map(function(slot) {
+
+      const previous =
+        previousSlotState.get(slot.time);
+
+      if (
+  previous !== undefined &&
+  previous !== slot.occupied
+) {
+  slotFlashUntil.set(
+    slot.time,
+    Date.now() + 2600
+  );
+}
+
+const changed =
+  (slotFlashUntil.get(slot.time) || 0) >
+  Date.now();
+
+previousSlotState.set(
+  slot.time,
+  slot.occupied
+);
+
+      return (
+        '<div class="slot ' +
+        (slot.occupied ? 'busy' : 'free') +
+        (changed ? ' changed' : '') +
+        '">' +
+
+        '<div>' +
+        esc(slot.time) +
+        '</div>' +
+
+        '<small>' +
+        (
+          slot.occupied
+            ? esc(slot.customer_name || 'Занято')
+            : 'Свободно'
+        ) +
+        '</small>' +
+
+        '</div>'
+      );
+    }).join('');
+}
 
     function renderBooking(
       data
