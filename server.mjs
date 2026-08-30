@@ -57,6 +57,14 @@ function markUi(action, focus, payload = {}) {
   uiState.last_action_at = new Date().toISOString();
   uiState.focus = focus ?? null;
 
+  if (focus !== 'products') {
+    uiState.product_ids = [];
+  }
+
+  if (focus !== 'services') {
+    uiState.service_ids = [];
+  }
+
   if (payload.selected_date !== undefined) {
     uiState.selected_date = payload.selected_date;
   }
@@ -68,9 +76,10 @@ function markUi(action, focus, payload = {}) {
   if (payload.product_ids !== undefined) {
     uiState.product_ids = payload.product_ids;
   }
+
   if (payload.service_ids !== undefined) {
-  uiState.service_ids = payload.service_ids;
-}
+    uiState.service_ids = payload.service_ids;
+  }
 }
 
 function getBusinessDate(offsetDays = 0) {
@@ -1074,15 +1083,15 @@ function createServer() {
     'search_products',
     {
       description:
-        'Search salon retail products by name or category and optionally by maximum price. Use for product recommendations and cheaper alternatives.',
+  'ALWAYS call this tool whenever the user asks about salon products, product names, categories, colors, prices, recommendations, cheaper alternatives, or what products are available. Do not answer product questions from memory or previous conversation context. Always retrieve the current product data with this tool first.',
 
       inputSchema: z.object({
         query: z
-          .string()
-          .min(1)
-          .describe(
-            'Product name, color, or category, for example красный лак or крем'
-          ),
+  .string()
+  .optional()
+  .describe(
+    'Optional product name, color, or category, for example красный лак or крем. Leave empty when the user asks to see all available products.'
+  ),
 
         max_price_kzt: z
           .number()
@@ -1169,7 +1178,7 @@ function createServer() {
     'check_product_stock',
     {
       description:
-        'Check the current price and stock quantity for one salon retail product.',
+  'ALWAYS call this tool when the user asks whether a specific salon product is in stock, available, sold out, how many units remain, or asks for the current stock or current price of a specific product. Do not answer stock questions from memory or previous conversation context. Use the product_id returned by search_products.',
 
       inputSchema: z.object({
         product_id: z
@@ -2062,6 +2071,32 @@ const DEMO_HTML = `<!doctype html>
         rgba(209,52,65,.14);
     }
 
+.stock.stock-highlight {
+  box-shadow:
+    0 0 0 1px rgba(112,242,140,.28),
+    0 0 22px rgba(112,242,140,.58);
+
+  transform: scale(1.12);
+
+  animation: stockPulse .8s ease-in-out 3;
+}
+
+.stock.out.stock-highlight {
+  box-shadow:
+    0 0 0 1px rgba(255,106,116,.30),
+    0 0 22px rgba(255,106,116,.62);
+}
+
+@keyframes stockPulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.45);
+  }
+}
+
     .footer {
       margin-top:
         14px;
@@ -2721,19 +2756,30 @@ previousSlotState.set(
             function(item) {
 
               const highlightClass =
-                highlighted.has(
-                  item.id
-                ) &&
-                actionIsFresh(
-                  data.ui
-                )
-                  ? ' highlight'
-                  : '';
+  data.ui &&
+  data.ui.focus === 'products' &&
+  highlighted.has(
+    item.id
+  ) &&
+  actionIsFresh(
+    data.ui
+  )
+    ? ' highlight'
+    : '';
 
               const stockClass =
                 item.stock > 0
                   ? 'stock'
                   : 'stock out';
+
+const stockHighlightClass =
+  data.ui &&
+  data.ui.focus === 'products' &&
+  data.ui.last_action === 'product_stock_checked' &&
+  highlighted.has(item.id) &&
+  actionIsFresh(data.ui)
+    ? ' stock-highlight'
+    : '';
 
               const stockText =
                 item.stock > 0
@@ -2777,8 +2823,9 @@ previousSlotState.set(
                 '</div>' +
 
                 '<span class="' +
-                stockClass +
-                '">' +
+stockClass +
+stockHighlightClass +
+'">' +
                 esc(
                   stockText
                 ) +
