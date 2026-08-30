@@ -22,7 +22,6 @@ const products = [
 
 const defaultSlots = ['10:00', '12:30', '15:00', '18:00', '19:30'];
 const bookings = [];
-
 const BUSINESS_TIME_ZONE = 'Asia/Almaty';
 
 function textResult(obj) {
@@ -92,7 +91,11 @@ function findBookingById(booking_id) {
   );
 }
 
-function isSlotOccupied(date, time, excludeBookingId = null) {
+function isSlotOccupied(
+  date,
+  time,
+  excludeBookingId = null
+) {
   return bookings.some(
     b =>
       b.booking_id !== excludeBookingId &&
@@ -102,10 +105,67 @@ function isSlotOccupied(date, time, excludeBookingId = null) {
   );
 }
 
+function findConfirmedBookingsByCustomer(customer_name) {
+  const q = normalize(customer_name);
+
+  return bookings.filter(
+    b =>
+      normalize(b.customer_name) === q &&
+      b.status === 'confirmed'
+  );
+}
+
+function resolveTargetBooking(
+  booking_id,
+  customer_name
+) {
+  if (booking_id) {
+    const booking = findBookingById(booking_id);
+
+    if (!booking) {
+      return {
+        error: 'Unknown booking_id.'
+      };
+    }
+
+    return { booking };
+  }
+
+  if (!customer_name) {
+    return {
+      error: 'Provide booking_id or customer_name.'
+    };
+  }
+
+  const matches =
+    findConfirmedBookingsByCustomer(
+      customer_name
+    );
+
+  if (matches.length === 0) {
+    return {
+      error:
+        `No confirmed booking found for ${customer_name}.`
+    };
+  }
+
+  if (matches.length > 1) {
+    return {
+      error:
+        `More than one confirmed booking found for ${customer_name}. ` +
+        'Call get_customer_bookings first and use booking_id.'
+    };
+  }
+
+  return {
+    booking: matches[0]
+  };
+}
+
 function createServer() {
   const server = new McpServer({
     name: 'yeti-nail-studio-demo',
-    version: '1.2.0'
+    version: '1.3.0'
   });
 
   server.registerTool(
@@ -113,13 +173,17 @@ function createServer() {
     {
       description:
         'Get salon services, prices in KZT, and duration. Use this when the user asks what services are available or how much a service costs.',
+
       inputSchema: z.object({
         category: z
           .string()
           .optional()
-          .describe('Optional category such as маникюр, педикюр, дизайн')
+          .describe(
+            'Optional category such as маникюр, педикюр, дизайн'
+          )
       })
     },
+
     async ({ category }) => {
       const q = normalize(category);
 
@@ -143,9 +207,14 @@ function createServer() {
     {
       description:
         'Check available appointment times for a requested date. Use before creating or rescheduling a booking. For relative dates, pass today or tomorrow instead of calculating the calendar date yourself.',
+
       inputSchema: z.object({
         date_type: z
-          .enum(['today', 'tomorrow', 'exact'])
+          .enum([
+            'today',
+            'tomorrow',
+            'exact'
+          ])
           .describe(
             'Use today for сегодня, tomorrow for завтра, and exact only when the user explicitly gives a calendar date.'
           ),
@@ -160,12 +229,20 @@ function createServer() {
         service_id: z
           .string()
           .optional()
-          .describe('Optional service id from get_services'),
+          .describe(
+            'Optional service id from get_services'
+          ),
 
         time_of_day: z
-          .enum(['morning', 'afternoon', 'evening'])
+          .enum([
+            'morning',
+            'afternoon',
+            'evening'
+          ])
           .optional()
-          .describe('Optional preferred part of day')
+          .describe(
+            'Optional preferred part of day'
+          )
       })
     },
 
@@ -187,26 +264,37 @@ function createServer() {
       }
 
       let slots = defaultSlots.filter(
-        time => !isSlotOccupied(date, time)
+        time =>
+          !isSlotOccupied(
+            date,
+            time
+          )
       );
 
       if (time_of_day === 'morning') {
-        slots = slots.filter(t => t < '12:00');
+        slots = slots.filter(
+          t => t < '12:00'
+        );
       }
 
       if (time_of_day === 'afternoon') {
         slots = slots.filter(
-          t => t >= '12:00' && t < '18:00'
+          t =>
+            t >= '12:00' &&
+            t < '18:00'
         );
       }
 
       if (time_of_day === 'evening') {
-        slots = slots.filter(t => t >= '18:00');
+        slots = slots.filter(
+          t => t >= '18:00'
+        );
       }
 
       return textResult({
         date,
-        service_id: service_id ?? null,
+        service_id:
+          service_id ?? null,
         available_slots: slots
       });
     }
@@ -229,10 +317,16 @@ function createServer() {
         service_id: z
           .string()
           .min(1)
-          .describe('Service id from get_services'),
+          .describe(
+            'Service id from get_services'
+          ),
 
         date_type: z
-          .enum(['today', 'tomorrow', 'exact'])
+          .enum([
+            'today',
+            'tomorrow',
+            'exact'
+          ])
           .describe(
             'Use today for сегодня, tomorrow for завтра, and exact only when the user explicitly gives a calendar date.'
           ),
@@ -246,7 +340,9 @@ function createServer() {
 
         time: z
           .string()
-          .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+          .regex(
+            /^([01]\d|2[0-3]):[0-5]\d$/
+          )
           .describe(
             'Appointment time in HH:MM format'
           )
@@ -281,13 +377,20 @@ function createServer() {
         );
       }
 
-      if (!defaultSlots.includes(time)) {
+      if (
+        !defaultSlots.includes(time)
+      ) {
         return errorResult(
           `Time ${time} is not an offered slot.`
         );
       }
 
-      if (isSlotOccupied(date, time)) {
+      if (
+        isSlotOccupied(
+          date,
+          time
+        )
+      ) {
         return errorResult(
           `Slot ${date} ${time} is no longer available. Call check_available_slots again.`
         );
@@ -301,20 +404,26 @@ function createServer() {
 
         customer_name,
         service_id,
-        service_name: service.name,
+        service_name:
+          service.name,
         date,
         time,
-        price_kzt: service.price_kzt,
+        price_kzt:
+          service.price_kzt,
         status: 'confirmed',
 
-        created_at: new Date().toISOString(),
+        created_at:
+          new Date().toISOString(),
+
         updated_at: null,
         cancelled_at: null
       };
 
       bookings.push(booking);
 
-      return textResult(booking);
+      return textResult(
+        booking
+      );
     }
   );
 
@@ -333,7 +442,11 @@ function createServer() {
           ),
 
         status: z
-          .enum(['confirmed', 'cancelled', 'all'])
+          .enum([
+            'confirmed',
+            'cancelled',
+            'all'
+          ])
           .optional()
           .describe(
             'Default confirmed. Use all only when history is needed.'
@@ -345,15 +458,25 @@ function createServer() {
       customer_name,
       status = 'confirmed'
     }) => {
-      const q = normalize(customer_name);
+      const q =
+        normalize(
+          customer_name
+        );
 
-      let list = bookings.filter(
-        b => normalize(b.customer_name) === q
-      );
+      let list =
+        bookings.filter(
+          b =>
+            normalize(
+              b.customer_name
+            ) === q
+        );
 
-      if (status !== 'all') {
+      if (
+        status !== 'all'
+      ) {
         list = list.filter(
-          b => b.status === status
+          b =>
+            b.status === status
         );
       }
 
@@ -368,7 +491,7 @@ function createServer() {
     'reschedule_booking',
     {
       description:
-        'Move an EXISTING confirmed booking to a new date and/or time while keeping the same booking_id. Always use get_customer_bookings first to obtain the correct booking_id. Do NOT create a second booking when the user asks to move, change, or reschedule an appointment.',
+        'Move an EXISTING confirmed booking to a new date and/or time while keeping the same booking_id. Use this for ONE reschedule action. If the user asks for TWO OR MORE dependent booking changes in the same message, use process_booking_changes instead.',
 
       inputSchema: z.object({
         booking_id: z
@@ -379,7 +502,11 @@ function createServer() {
           ),
 
         new_date_type: z
-          .enum(['today', 'tomorrow', 'exact'])
+          .enum([
+            'today',
+            'tomorrow',
+            'exact'
+          ])
           .describe(
             'Use today for сегодня, tomorrow for завтра, and exact only when the user explicitly gives a calendar date.'
           ),
@@ -393,7 +520,9 @@ function createServer() {
 
         new_time: z
           .string()
-          .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+          .regex(
+            /^([01]\d|2[0-3]):[0-5]\d$/
+          )
           .describe(
             'New appointment time in HH:MM format'
           )
@@ -407,7 +536,9 @@ function createServer() {
       new_time
     }) => {
       const booking =
-        findBookingById(booking_id);
+        findBookingById(
+          booking_id
+        );
 
       if (!booking) {
         return errorResult(
@@ -415,16 +546,20 @@ function createServer() {
         );
       }
 
-      if (booking.status !== 'confirmed') {
+      if (
+        booking.status !==
+        'confirmed'
+      ) {
         return errorResult(
           `Booking ${booking_id} is not active and cannot be rescheduled.`
         );
       }
 
-      const newDate = resolveBookingDate(
-        new_date_type,
-        new_exact_date
-      );
+      const newDate =
+        resolveBookingDate(
+          new_date_type,
+          new_exact_date
+        );
 
       if (!newDate) {
         return errorResult(
@@ -432,7 +567,11 @@ function createServer() {
         );
       }
 
-      if (!defaultSlots.includes(new_time)) {
+      if (
+        !defaultSlots.includes(
+          new_time
+        )
+      ) {
         return errorResult(
           `Time ${new_time} is not an offered slot.`
         );
@@ -455,13 +594,19 @@ function createServer() {
         time: booking.time
       };
 
-      booking.date = newDate;
-      booking.time = new_time;
+      booking.date =
+        newDate;
+
+      booking.time =
+        new_time;
+
       booking.updated_at =
-        new Date().toISOString();
+        new Date()
+          .toISOString();
 
       return textResult({
-        action: 'rescheduled',
+        action:
+          'rescheduled',
         previous,
         booking
       });
@@ -472,7 +617,7 @@ function createServer() {
     'cancel_booking',
     {
       description:
-        'Cancel an EXISTING confirmed salon booking. Always use get_customer_bookings first to obtain the correct booking_id when the user says cancel my appointment, remove my booking, or I cannot come. Do not tell the user to contact an administrator when this tool can perform the cancellation.',
+        'Cancel an EXISTING confirmed salon booking. Use this for ONE cancellation action. Always use get_customer_bookings first to obtain the correct booking_id when needed. If the user asks for TWO OR MORE dependent booking changes in the same message, use process_booking_changes instead.',
 
       inputSchema: z.object({
         booking_id: z
@@ -484,9 +629,13 @@ function createServer() {
       })
     },
 
-    async ({ booking_id }) => {
+    async ({
+      booking_id
+    }) => {
       const booking =
-        findBookingById(booking_id);
+        findBookingById(
+          booking_id
+        );
 
       if (!booking) {
         return errorResult(
@@ -494,21 +643,254 @@ function createServer() {
         );
       }
 
-      if (booking.status === 'cancelled') {
+      if (
+        booking.status ===
+        'cancelled'
+      ) {
         return errorResult(
           `Booking ${booking_id} is already cancelled.`
         );
       }
 
-      booking.status = 'cancelled';
+      booking.status =
+        'cancelled';
+
       booking.cancelled_at =
-        new Date().toISOString();
+        new Date()
+          .toISOString();
 
       booking.updated_at =
         booking.cancelled_at;
 
       return textResult({
-        action: 'cancelled',
+        action:
+          'cancelled',
+        booking
+      });
+    }
+  );
+
+  server.registerTool(
+    'process_booking_changes',
+    {
+      description:
+        'Execute TWO OR MORE dependent changes to the SAME existing booking in the exact order requested by the user, inside one reliable server-side workflow. Example: reschedule the booking to 15:00 and then cancel it. Use this instead of separate reschedule_booking/cancel_booking calls when multiple dependent changes are requested in ONE user message. The server executes actions sequentially and stops if a step fails.',
+
+      inputSchema: z.object({
+        booking_id: z
+          .string()
+          .optional()
+          .describe(
+            'Existing booking id if known. Prefer this when available.'
+          ),
+
+        customer_name: z
+          .string()
+          .optional()
+          .describe(
+            'Customer name. Used to locate the booking when booking_id is not known. This works automatically only when the customer has exactly one confirmed booking.'
+          ),
+
+        actions: z
+          .array(
+            z.enum([
+              'reschedule',
+              'cancel'
+            ])
+          )
+          .min(2)
+          .max(4)
+          .describe(
+            'Ordered list of actions exactly as requested by the user. Example: ["reschedule", "cancel"].'
+          ),
+
+        new_date_type: z
+          .enum([
+            'today',
+            'tomorrow',
+            'exact'
+          ])
+          .optional()
+          .describe(
+            'Required when actions contains reschedule. Use today, tomorrow, or exact.'
+          ),
+
+        new_exact_date: z
+          .string()
+          .optional()
+          .describe(
+            'YYYY-MM-DD only when new_date_type is exact.'
+          ),
+
+        new_time: z
+          .string()
+          .regex(
+            /^([01]\d|2[0-3]):[0-5]\d$/
+          )
+          .optional()
+          .describe(
+            'Required when actions contains reschedule. New time in HH:MM format.'
+          )
+      })
+    },
+
+    async ({
+      booking_id,
+      customer_name,
+      actions,
+      new_date_type,
+      new_exact_date,
+      new_time
+    }) => {
+      const target =
+        resolveTargetBooking(
+          booking_id,
+          customer_name
+        );
+
+      if (
+        target.error
+      ) {
+        return errorResult(
+          target.error
+        );
+      }
+
+      const booking =
+        target.booking;
+
+      if (
+        booking.status !==
+        'confirmed'
+      ) {
+        return errorResult(
+          `Booking ${booking.booking_id} is not active.`
+        );
+      }
+
+      const steps = [];
+
+      for (
+        const action of actions
+      ) {
+        if (
+          action ===
+          'reschedule'
+        ) {
+          if (
+            !new_date_type ||
+            !new_time
+          ) {
+            return errorResult(
+              'Reschedule step requires new_date_type and new_time.'
+            );
+          }
+
+          const newDate =
+            resolveBookingDate(
+              new_date_type,
+              new_exact_date
+            );
+
+          if (!newDate) {
+            return errorResult(
+              'Invalid new appointment date for reschedule step.'
+            );
+          }
+
+          if (
+            !defaultSlots.includes(
+              new_time
+            )
+          ) {
+            return errorResult(
+              `Time ${new_time} is not an offered slot.`
+            );
+          }
+
+          if (
+            isSlotOccupied(
+              newDate,
+              new_time,
+              booking.booking_id
+            )
+          ) {
+            return errorResult(
+              `Slot ${newDate} ${new_time} is already occupied.`
+            );
+          }
+
+          const previous = {
+            date:
+              booking.date,
+
+            time:
+              booking.time
+          };
+
+          booking.date =
+            newDate;
+
+          booking.time =
+            new_time;
+
+          booking.updated_at =
+            new Date()
+              .toISOString();
+
+          steps.push({
+            action:
+              'rescheduled',
+
+            previous,
+
+            current: {
+              date:
+                booking.date,
+
+              time:
+                booking.time
+            }
+          });
+
+          continue;
+        }
+
+        if (
+          action ===
+          'cancel'
+        ) {
+          if (
+            booking.status !==
+            'confirmed'
+          ) {
+            return errorResult(
+              `Booking ${booking.booking_id} is already cancelled.`
+            );
+          }
+
+          booking.status =
+            'cancelled';
+
+          booking.cancelled_at =
+            new Date()
+              .toISOString();
+
+          booking.updated_at =
+            booking.cancelled_at;
+
+          steps.push({
+            action:
+              'cancelled'
+          });
+        }
+      }
+
+      return textResult({
+        action:
+          'workflow_completed',
+
+        steps,
         booking
       });
     }
@@ -542,41 +924,56 @@ function createServer() {
       query,
       max_price_kzt
     }) => {
-      const q = normalize(query);
+      const q =
+        normalize(query);
 
-      let list = products.filter(
-        p =>
-          normalize(
-            `${p.name} ${p.category}`
-          ).includes(q)
-      );
-
-      if (list.length === 0) {
-        const terms = q
-          .split(/\s+/)
-          .filter(Boolean);
-
-        list = products.filter(
+      let list =
+        products.filter(
           p =>
-            terms.some(
-              term =>
-                normalize(
-                  `${p.name} ${p.category}`
-                ).includes(term)
-            )
+            normalize(
+              `${p.name} ${p.category}`
+            ).includes(q)
         );
+
+      if (
+        list.length === 0
+      ) {
+        const terms =
+          q
+            .split(/\s+/)
+            .filter(Boolean);
+
+        list =
+          products.filter(
+            p =>
+              terms.some(
+                term =>
+                  normalize(
+                    `${p.name} ${p.category}`
+                  ).includes(
+                    term
+                  )
+              )
+          );
       }
 
-      if (max_price_kzt !== undefined) {
-        list = list.filter(
-          p =>
-            p.price_kzt <= max_price_kzt
-        );
+      if (
+        max_price_kzt !==
+        undefined
+      ) {
+        list =
+          list.filter(
+            p =>
+              p.price_kzt <=
+              max_price_kzt
+          );
       }
 
       return textResult({
-        currency: 'KZT',
-        products: list
+        currency:
+          'KZT',
+        products:
+          list
       });
     }
   );
@@ -597,10 +994,14 @@ function createServer() {
       })
     },
 
-    async ({ product_id }) => {
+    async ({
+      product_id
+    }) => {
       const product =
         products.find(
-          p => p.id === product_id
+          p =>
+            p.id ===
+            product_id
         );
 
       if (!product) {
@@ -611,8 +1012,10 @@ function createServer() {
 
       return textResult({
         ...product,
-        in_stock: product.stock > 0,
-        currency: 'KZT'
+        in_stock:
+          product.stock > 0,
+        currency:
+          'KZT'
       });
     }
   );
@@ -620,14 +1023,18 @@ function createServer() {
   return server;
 }
 
-const handler = createMcpHandler(
-  () => createServer()
-);
+const handler =
+  createMcpHandler(
+    () => createServer()
+  );
 
 const nodeHandler =
-  toNodeHandler(handler);
+  toNodeHandler(
+    handler
+  );
 
-const host = '0.0.0.0';
+const host =
+  '0.0.0.0';
 
 const allowedHosts = [
   'localhost',
@@ -635,10 +1042,12 @@ const allowedHosts = [
 ];
 
 if (
-  process.env.RENDER_EXTERNAL_HOSTNAME
+  process.env
+    .RENDER_EXTERNAL_HOSTNAME
 ) {
   allowedHosts.push(
-    process.env.RENDER_EXTERNAL_HOSTNAME
+    process.env
+      .RENDER_EXTERNAL_HOSTNAME
   );
 }
 
@@ -648,23 +1057,36 @@ const app =
     allowedHosts
   });
 
-app.get('/', async () => ({
-  ok: true,
-  service: 'Yeti Nail Studio MCP Demo',
-  version: '1.2.0',
-  mcp_endpoint: '/mcp',
-  demo_bookings: '/bookings'
-}));
+app.get(
+  '/',
+  async () => ({
+    ok: true,
+    service:
+      'Yeti Nail Studio MCP Demo',
+    version:
+      '1.3.0',
+    mcp_endpoint:
+      '/mcp',
+    demo_bookings:
+      '/bookings'
+  })
+);
 
-app.get('/bookings', async () => ({
-  warning:
-    'Demo memory storage: data resets when the server restarts or sleeps.',
-  bookings
-}));
+app.get(
+  '/bookings',
+  async () => ({
+    warning:
+      'Demo memory storage: data resets when the server restarts or sleeps.',
+    bookings
+  })
+);
 
 app.all(
   '/mcp',
-  async (request, reply) =>
+  async (
+    request,
+    reply
+  ) =>
     nodeHandler(
       request.raw,
       reply.raw,
@@ -672,9 +1094,11 @@ app.all(
     )
 );
 
-const port = Number(
-  process.env.PORT || 3000
-);
+const port =
+  Number(
+    process.env.PORT ||
+      3000
+  );
 
 await app.listen({
   port,
