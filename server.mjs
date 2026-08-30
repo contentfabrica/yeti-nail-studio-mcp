@@ -2905,5 +2905,5 @@ await app.listen({
 });
 
 console.log(
-  \`Yeti Nail Studio MCP v1.4.0 running on port \${port}\`
+  `Yeti Nail Studio MCP v1.4.0 running on port ${port}`
 );
