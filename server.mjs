@@ -24,6 +24,15 @@ const defaultSlots = ['10:00', '12:30', '15:00', '18:00', '19:30'];
 const bookings = [];
 const BUSINESS_TIME_ZONE = 'Asia/Almaty';
 
+const uiState = {
+  last_action: 'idle',
+  last_action_at: null,
+  focus: null,
+  selected_date: null,
+  touched_booking_id: null,
+  product_ids: []
+};
+
 function textResult(obj) {
   return {
     content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }],
@@ -40,6 +49,24 @@ function errorResult(message) {
 
 function normalize(s = '') {
   return s.toString().trim().toLowerCase();
+}
+
+function markUi(action, focus, payload = {}) {
+  uiState.last_action = action;
+  uiState.last_action_at = new Date().toISOString();
+  uiState.focus = focus ?? null;
+
+  if (payload.selected_date !== undefined) {
+    uiState.selected_date = payload.selected_date;
+  }
+
+  if (payload.touched_booking_id !== undefined) {
+    uiState.touched_booking_id = payload.touched_booking_id;
+  }
+
+  if (payload.product_ids !== undefined) {
+    uiState.product_ids = payload.product_ids;
+  }
 }
 
 function getBusinessDate(offsetDays = 0) {
@@ -91,11 +118,7 @@ function findBookingById(booking_id) {
   );
 }
 
-function isSlotOccupied(
-  date,
-  time,
-  excludeBookingId = null
-) {
+function isSlotOccupied(date, time, excludeBookingId = null) {
   return bookings.some(
     b =>
       b.booking_id !== excludeBookingId &&
@@ -115,38 +138,25 @@ function findConfirmedBookingsByCustomer(customer_name) {
   );
 }
 
-function resolveTargetBooking(
-  booking_id,
-  customer_name
-) {
+function resolveTargetBooking(booking_id, customer_name) {
   if (booking_id) {
     const booking = findBookingById(booking_id);
 
     if (!booking) {
-      return {
-        error: 'Unknown booking_id.'
-      };
+      return { error: 'Unknown booking_id.' };
     }
 
     return { booking };
   }
 
   if (!customer_name) {
-    return {
-      error: 'Provide booking_id or customer_name.'
-    };
+    return { error: 'Provide booking_id or customer_name.' };
   }
 
-  const matches =
-    findConfirmedBookingsByCustomer(
-      customer_name
-    );
+  const matches = findConfirmedBookingsByCustomer(customer_name);
 
   if (matches.length === 0) {
-    return {
-      error:
-        `No confirmed booking found for ${customer_name}.`
-    };
+    return { error: `No confirmed booking found for ${customer_name}.` };
   }
 
   if (matches.length > 1) {
@@ -157,15 +167,60 @@ function resolveTargetBooking(
     };
   }
 
+  return { booking: matches[0] };
+}
+
+function latestBookingFirst(list) {
+  return [...list].sort((a, b) => {
+    const ta = new Date(
+      a.updated_at || a.cancelled_at || a.created_at || 0
+    ).getTime();
+
+    const tb = new Date(
+      b.updated_at || b.cancelled_at || b.created_at || 0
+    ).getTime();
+
+    return tb - ta;
+  });
+}
+
+function buildDemoData() {
+  const displayDate =
+    uiState.selected_date || getBusinessDate(1);
+
+  const slots = defaultSlots.map(time => {
+    const booking = bookings.find(
+      b =>
+        b.date === displayDate &&
+        b.time === time &&
+        b.status === 'confirmed'
+    );
+
+    return {
+      time,
+      occupied: Boolean(booking),
+      customer_name: booking?.customer_name ?? null,
+      booking_id: booking?.booking_id ?? null
+    };
+  });
+
   return {
-    booking: matches[0]
+    service: 'Yeti Nail Studio',
+    timezone: BUSINESS_TIME_ZONE,
+    generated_at: new Date().toISOString(),
+    display_date: displayDate,
+    services,
+    slots,
+    bookings: latestBookingFirst(bookings),
+    products,
+    ui: { ...uiState }
   };
 }
 
 function createServer() {
   const server = new McpServer({
     name: 'yeti-nail-studio-demo',
-    version: '1.3.0'
+    version: '1.4.0'
   });
 
   server.registerTool(
@@ -194,6 +249,11 @@ function createServer() {
               normalize(s.name).includes(q)
           )
         : services;
+
+      markUi(
+        'services_loaded',
+        'services'
+      );
 
       return textResult({
         currency: 'KZT',
@@ -291,11 +351,20 @@ function createServer() {
         );
       }
 
+      markUi(
+        'slots_checked',
+        'slots',
+        {
+          selected_date: date
+        }
+      );
+
       return textResult({
         date,
         service_id:
           service_id ?? null,
-        available_slots: slots
+        available_slots:
+          slots
       });
     }
   );
@@ -356,10 +425,11 @@ function createServer() {
       exact_date,
       time
     }) => {
-      const date = resolveBookingDate(
-        date_type,
-        exact_date
-      );
+      const date =
+        resolveBookingDate(
+          date_type,
+          exact_date
+        );
 
       if (!date) {
         return errorResult(
@@ -367,9 +437,12 @@ function createServer() {
         );
       }
 
-      const service = services.find(
-        s => s.id === service_id
-      );
+      const service =
+        services.find(
+          s =>
+            s.id ===
+            service_id
+        );
 
       if (!service) {
         return errorResult(
@@ -378,7 +451,9 @@ function createServer() {
       }
 
       if (
-        !defaultSlots.includes(time)
+        !defaultSlots.includes(
+          time
+        )
       ) {
         return errorResult(
           `Time ${time} is not an offered slot.`
@@ -410,16 +485,36 @@ function createServer() {
         time,
         price_kzt:
           service.price_kzt,
-        status: 'confirmed',
+
+        status:
+          'confirmed',
 
         created_at:
-          new Date().toISOString(),
+          new Date()
+            .toISOString(),
 
-        updated_at: null,
-        cancelled_at: null
+        updated_at:
+          null,
+
+        cancelled_at:
+          null
       };
 
-      bookings.push(booking);
+      bookings.push(
+        booking
+      );
+
+      markUi(
+        'booking_created',
+        'booking',
+        {
+          selected_date:
+            date,
+
+          touched_booking_id:
+            booking.booking_id
+        }
+      );
 
       return textResult(
         booking
@@ -474,11 +569,32 @@ function createServer() {
       if (
         status !== 'all'
       ) {
-        list = list.filter(
-          b =>
-            b.status === status
-        );
+        list =
+          list.filter(
+            b =>
+              b.status ===
+              status
+          );
       }
+
+      const first =
+        latestBookingFirst(
+          list
+        )[0] ?? null;
+
+      markUi(
+        'booking_checked',
+        'booking',
+        {
+          selected_date:
+            first?.date ??
+            uiState.selected_date,
+
+          touched_booking_id:
+            first?.booking_id ??
+            null
+        }
+      );
 
       return textResult({
         customer_name,
@@ -590,8 +706,10 @@ function createServer() {
       }
 
       const previous = {
-        date: booking.date,
-        time: booking.time
+        date:
+          booking.date,
+        time:
+          booking.time
       };
 
       booking.date =
@@ -603,6 +721,18 @@ function createServer() {
       booking.updated_at =
         new Date()
           .toISOString();
+
+      markUi(
+        'booking_rescheduled',
+        'booking',
+        {
+          selected_date:
+            newDate,
+
+          touched_booking_id:
+            booking.booking_id
+        }
+      );
 
       return textResult({
         action:
@@ -661,6 +791,18 @@ function createServer() {
 
       booking.updated_at =
         booking.cancelled_at;
+
+      markUi(
+        'booking_cancelled',
+        'booking',
+        {
+          selected_date:
+            booking.date,
+
+          touched_booking_id:
+            booking.booking_id
+        }
+      );
 
       return textResult({
         action:
@@ -771,12 +913,22 @@ function createServer() {
       const steps = [];
 
       for (
-        const action of actions
+        const action
+        of actions
       ) {
         if (
           action ===
           'reschedule'
         ) {
+          if (
+            booking.status !==
+            'confirmed'
+          ) {
+            return errorResult(
+              `Booking ${booking.booking_id} is not active and cannot be rescheduled.`
+            );
+          }
+
           if (
             !new_date_type ||
             !new_time
@@ -792,7 +944,9 @@ function createServer() {
               new_exact_date
             );
 
-          if (!newDate) {
+          if (
+            !newDate
+          ) {
             return errorResult(
               'Invalid new appointment date for reschedule step.'
             );
@@ -886,10 +1040,21 @@ function createServer() {
         }
       }
 
+      markUi(
+        'booking_workflow_completed',
+        'booking',
+        {
+          selected_date:
+            booking.date,
+
+          touched_booking_id:
+            booking.booking_id
+        }
+      );
+
       return textResult({
         action:
           'workflow_completed',
-
         steps,
         booking
       });
@@ -925,7 +1090,9 @@ function createServer() {
       max_price_kzt
     }) => {
       const q =
-        normalize(query);
+        normalize(
+          query
+        );
 
       let list =
         products.filter(
@@ -969,6 +1136,17 @@ function createServer() {
           );
       }
 
+      markUi(
+        'products_found',
+        'products',
+        {
+          product_ids:
+            list.map(
+              p => p.id
+            )
+        }
+      );
+
       return textResult({
         currency:
           'KZT',
@@ -1004,11 +1182,22 @@ function createServer() {
             product_id
         );
 
-      if (!product) {
+      if (
+        !product
+      ) {
         return errorResult(
           'Unknown product_id. Call search_products first.'
         );
       }
+
+      markUi(
+        'product_stock_checked',
+        'products',
+        {
+          product_ids:
+            [product.id]
+        }
+      );
 
       return textResult({
         ...product,
@@ -1022,6 +1211,1560 @@ function createServer() {
 
   return server;
 }
+
+const DEMO_HTML = `<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+  <title>
+    Yeti Nail Studio — Live Demo
+  </title>
+
+  <style>
+    :root {
+      --bg: #070812;
+      --panel: #111323;
+      --panel2: #17182b;
+      --line: rgba(255,255,255,.09);
+      --text: #f6f7fb;
+      --muted: #9ea4bb;
+      --pink: #ff4f9d;
+      --purple: #8f63ff;
+      --green: #70f28c;
+      --red: #ff6a74;
+      --yellow: #ffc85c;
+    }
+
+    * {
+      box-sizing:
+        border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+
+      background:
+        radial-gradient(
+          circle at 20% 0%,
+          rgba(143,99,255,.16),
+          transparent 36%
+        ),
+        radial-gradient(
+          circle at 100% 18%,
+          rgba(255,79,157,.12),
+          transparent 32%
+        ),
+        var(--bg);
+
+      color:
+        var(--text);
+
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    }
+
+    body {
+      padding:
+        22px;
+    }
+
+    .shell {
+      max-width:
+        1540px;
+
+      margin:
+        0 auto;
+    }
+
+    .topbar {
+      display:
+        flex;
+
+      justify-content:
+        space-between;
+
+      align-items:
+        center;
+
+      gap:
+        16px;
+
+      margin-bottom:
+        18px;
+    }
+
+    .brand {
+      display:
+        flex;
+
+      align-items:
+        center;
+
+      gap:
+        14px;
+    }
+
+    .brand-mark {
+      width:
+        48px;
+
+      height:
+        48px;
+
+      border-radius:
+        15px;
+
+      display:
+        grid;
+
+      place-items:
+        center;
+
+      font-size:
+        25px;
+
+      background:
+        linear-gradient(
+          145deg,
+          rgba(255,79,157,.28),
+          rgba(143,99,255,.28)
+        );
+
+      border:
+        1px solid
+        rgba(255,255,255,.12);
+
+      box-shadow:
+        0 10px 34px
+        rgba(143,99,255,.18);
+    }
+
+    .brand h1 {
+      margin:
+        0;
+
+      font-size:
+        26px;
+
+      letter-spacing:
+        .03em;
+    }
+
+    .brand p {
+      margin:
+        4px 0 0;
+
+      color:
+        var(--pink);
+
+      font-size:
+        12px;
+
+      letter-spacing:
+        .16em;
+
+      text-transform:
+        uppercase;
+
+      font-weight:
+        800;
+    }
+
+    .live {
+      display:
+        inline-flex;
+
+      align-items:
+        center;
+
+      gap:
+        9px;
+
+      padding:
+        11px 16px;
+
+      border-radius:
+        999px;
+
+      background:
+        rgba(255,255,255,.045);
+
+      border:
+        1px solid
+        var(--line);
+
+      color:
+        #e8eaf4;
+
+      font-size:
+        13px;
+
+      font-weight:
+        800;
+    }
+
+    .live-dot {
+      width:
+        9px;
+
+      height:
+        9px;
+
+      border-radius:
+        50%;
+
+      background:
+        var(--green);
+
+      box-shadow:
+        0 0 15px
+        rgba(112,242,140,.8);
+    }
+
+    .grid {
+      display:
+        grid;
+
+      grid-template-columns:
+        1.05fr
+        1.3fr
+        1.05fr;
+
+      gap:
+        16px;
+
+      align-items:
+        stretch;
+    }
+
+    .stack {
+      display:
+        grid;
+
+      gap:
+        16px;
+    }
+
+    .panel {
+      background:
+        linear-gradient(
+          180deg,
+          rgba(23,24,43,.95),
+          rgba(14,16,30,.96)
+        );
+
+      border:
+        1px solid
+        var(--line);
+
+      border-radius:
+        22px;
+
+      padding:
+        18px;
+
+      box-shadow:
+        0 18px 55px
+        rgba(0,0,0,.25);
+
+      transition:
+        transform .22s ease,
+        border-color .22s ease,
+        box-shadow .22s ease;
+    }
+
+    .panel.glow {
+      border-color:
+        rgba(255,79,157,.78);
+
+      box-shadow:
+        0 0 0 1px
+        rgba(255,79,157,.2),
+        0 0 34px
+        rgba(255,79,157,.22),
+        0 18px 55px
+        rgba(0,0,0,.28);
+
+      transform:
+        translateY(-1px);
+    }
+
+    .panel-title {
+      display:
+        flex;
+
+      justify-content:
+        space-between;
+
+      align-items:
+        center;
+
+      gap:
+        10px;
+
+      margin-bottom:
+        14px;
+    }
+
+    .panel-title h2 {
+      margin:
+        0;
+
+      font-size:
+        15px;
+
+      letter-spacing:
+        .02em;
+    }
+
+    .date-chip {
+      color:
+        #c7cbe0;
+
+      font-size:
+        12px;
+
+      padding:
+        7px 10px;
+
+      border-radius:
+        10px;
+
+      border:
+        1px solid
+        var(--line);
+
+      background:
+        rgba(255,255,255,.035);
+    }
+
+    .list {
+      display:
+        grid;
+
+      gap:
+        9px;
+    }
+
+    .service,
+    .product {
+      display:
+        grid;
+
+      grid-template-columns:
+        42px
+        1fr
+        auto;
+
+      gap:
+        12px;
+
+      align-items:
+        center;
+
+      padding:
+        12px;
+
+      border-radius:
+        15px;
+
+      background:
+        rgba(255,255,255,.035);
+
+      border:
+        1px solid
+        rgba(255,255,255,.065);
+
+      transition:
+        border-color .22s ease,
+        background .22s ease,
+        transform .22s ease;
+    }
+
+    .product.highlight {
+      border-color:
+        rgba(255,79,157,.78);
+
+      background:
+        rgba(255,79,157,.08);
+
+      transform:
+        translateX(-2px);
+    }
+
+    .icon {
+      width:
+        42px;
+
+      height:
+        42px;
+
+      border-radius:
+        13px;
+
+      display:
+        grid;
+
+      place-items:
+        center;
+
+      font-size:
+        21px;
+
+      background:
+        linear-gradient(
+          145deg,
+          rgba(255,79,157,.16),
+          rgba(143,99,255,.16)
+        );
+    }
+
+    .name {
+      font-weight:
+        800;
+
+      font-size:
+        13px;
+
+      line-height:
+        1.25;
+    }
+
+    .meta {
+      color:
+        var(--muted);
+
+      font-size:
+        11px;
+
+      margin-top:
+        4px;
+    }
+
+    .price {
+      color:
+        #ff77b6;
+
+      font-size:
+        14px;
+
+      font-weight:
+        900;
+
+      white-space:
+        nowrap;
+    }
+
+    .slots {
+      display:
+        grid;
+
+      grid-template-columns:
+        repeat(
+          5,
+          minmax(0, 1fr)
+        );
+
+      gap:
+        10px;
+    }
+
+    .slot {
+      min-height:
+        64px;
+
+      border-radius:
+        15px;
+
+      display:
+        flex;
+
+      flex-direction:
+        column;
+
+      align-items:
+        center;
+
+      justify-content:
+        center;
+
+      gap:
+        4px;
+
+      border:
+        1px solid
+        rgba(255,255,255,.08);
+
+      font-weight:
+        900;
+
+      font-size:
+        17px;
+
+      transition:
+        all .2s ease;
+    }
+
+    .slot.free {
+      color:
+        #a7ffb7;
+
+      background:
+        rgba(41,181,75,.15);
+
+      border-color:
+        rgba(112,242,140,.24);
+    }
+
+    .slot.busy {
+      color:
+        #ff9da5;
+
+      background:
+        rgba(209,52,65,.15);
+
+      border-color:
+        rgba(255,106,116,.30);
+    }
+
+    .slot small {
+      color:
+        var(--muted);
+
+      font-size:
+        9px;
+
+      font-weight:
+        700;
+
+      max-width:
+        100%;
+
+      white-space:
+        nowrap;
+
+      overflow:
+        hidden;
+
+      text-overflow:
+        ellipsis;
+    }
+
+    .booking-card {
+      min-height:
+        196px;
+
+      display:
+        flex;
+
+      flex-direction:
+        column;
+
+      justify-content:
+        center;
+
+      gap:
+        13px;
+
+      padding:
+        4px 2px;
+    }
+
+    .booking-empty {
+      min-height:
+        176px;
+
+      border:
+        1px dashed
+        rgba(255,255,255,.12);
+
+      border-radius:
+        17px;
+
+      display:
+        grid;
+
+      place-items:
+        center;
+
+      text-align:
+        center;
+
+      color:
+        var(--muted);
+
+      padding:
+        24px;
+    }
+
+    .booking-person {
+      display:
+        flex;
+
+      align-items:
+        center;
+
+      gap:
+        13px;
+    }
+
+    .avatar {
+      width:
+        52px;
+
+      height:
+        52px;
+
+      border-radius:
+        16px;
+
+      display:
+        grid;
+
+      place-items:
+        center;
+
+      font-size:
+        24px;
+
+      background:
+        linear-gradient(
+          145deg,
+          rgba(143,99,255,.45),
+          rgba(255,79,157,.25)
+        );
+
+      border:
+        1px solid
+        rgba(255,255,255,.12);
+    }
+
+    .booking-main {
+      display:
+        grid;
+
+      grid-template-columns:
+        1fr auto;
+
+      gap:
+        16px;
+
+      align-items:
+        end;
+
+      padding-top:
+        13px;
+
+      border-top:
+        1px solid
+        var(--line);
+    }
+
+    .booking-service {
+      font-size:
+        18px;
+
+      font-weight:
+        900;
+    }
+
+    .booking-time {
+      margin-top:
+        7px;
+
+      color:
+        #d8dbee;
+
+      font-size:
+        13px;
+    }
+
+    .status {
+      display:
+        inline-flex;
+
+      align-items:
+        center;
+
+      justify-content:
+        center;
+
+      min-width:
+        112px;
+
+      padding:
+        9px 11px;
+
+      border-radius:
+        999px;
+
+      font-size:
+        10px;
+
+      font-weight:
+        900;
+
+      letter-spacing:
+        .06em;
+
+      text-transform:
+        uppercase;
+    }
+
+    .status.confirmed {
+      color:
+        #bcffc8;
+
+      background:
+        rgba(41,181,75,.16);
+
+      border:
+        1px solid
+        rgba(112,242,140,.22);
+    }
+
+    .status.cancelled {
+      color:
+        #ffc0c5;
+
+      background:
+        rgba(209,52,65,.16);
+
+      border:
+        1px solid
+        rgba(255,106,116,.24);
+    }
+
+    .stock {
+      margin-top:
+        5px;
+
+      display:
+        inline-block;
+
+      color:
+        #c6ffd0;
+
+      font-size:
+        10px;
+
+      font-weight:
+        900;
+
+      padding:
+        4px 7px;
+
+      border-radius:
+        8px;
+
+      background:
+        rgba(41,181,75,.14);
+    }
+
+    .stock.out {
+      color:
+        #ffc0c5;
+
+      background:
+        rgba(209,52,65,.14);
+    }
+
+    .footer {
+      margin-top:
+        14px;
+
+      display:
+        flex;
+
+      justify-content:
+        space-between;
+
+      gap:
+        14px;
+
+      color:
+        #727991;
+
+      font-size:
+        10px;
+    }
+
+    @media (
+      max-width: 1120px
+    ) {
+      .grid {
+        grid-template-columns:
+          1fr 1fr;
+      }
+
+      .products-panel {
+        grid-column:
+          1 / -1;
+      }
+
+      .products-panel .list {
+        grid-template-columns:
+          repeat(
+            2,
+            minmax(0,1fr)
+          );
+      }
+    }
+
+    @media (
+      max-width: 760px
+    ) {
+      body {
+        padding:
+          12px;
+      }
+
+      .topbar {
+        align-items:
+          flex-start;
+      }
+
+      .grid {
+        grid-template-columns:
+          1fr;
+      }
+
+      .products-panel {
+        grid-column:
+          auto;
+      }
+
+      .products-panel .list {
+        grid-template-columns:
+          1fr;
+      }
+
+      .slots {
+        grid-template-columns:
+          repeat(
+            2,
+            minmax(0,1fr)
+          );
+      }
+
+      .brand h1 {
+        font-size:
+          20px;
+      }
+
+      .live {
+        font-size:
+          11px;
+
+        padding:
+          9px 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+
+    <div class="topbar">
+
+      <div class="brand">
+
+        <div class="brand-mark">
+          💅
+        </div>
+
+        <div>
+          <h1>
+            YETI NAIL STUDIO
+          </h1>
+
+          <p>
+            Live salon system
+          </p>
+        </div>
+
+      </div>
+
+      <div class="live">
+        <span class="live-dot"></span>
+        LIVE
+      </div>
+
+    </div>
+
+    <div class="grid">
+
+      <section
+        id="servicesPanel"
+        class="panel"
+      >
+        <div class="panel-title">
+          <h2>
+            УСЛУГИ
+          </h2>
+        </div>
+
+        <div
+          id="services"
+          class="list"
+        ></div>
+      </section>
+
+      <div class="stack">
+
+        <section
+          id="slotsPanel"
+          class="panel"
+        >
+          <div class="panel-title">
+
+            <h2>
+              СВОБОДНЫЕ СЛОТЫ
+            </h2>
+
+            <div
+              id="displayDate"
+              class="date-chip"
+            >
+              —
+            </div>
+
+          </div>
+
+          <div
+            id="slots"
+            class="slots"
+          ></div>
+        </section>
+
+        <section
+          id="bookingPanel"
+          class="panel"
+        >
+          <div class="panel-title">
+            <h2>
+              ЗАПИСЬ КЛИЕНТА
+            </h2>
+          </div>
+
+          <div
+            id="booking"
+          ></div>
+        </section>
+
+      </div>
+
+      <section
+        id="productsPanel"
+        class="panel products-panel"
+      >
+        <div class="panel-title">
+          <h2>
+            ТОВАРЫ
+          </h2>
+        </div>
+
+        <div
+          id="products"
+          class="list"
+        ></div>
+      </section>
+
+    </div>
+
+    <div class="footer">
+      <span>
+        Данные обновляются автоматически
+      </span>
+
+      <span id="updatedAt">
+        —
+      </span>
+    </div>
+
+  </div>
+
+  <script>
+    function esc(value) {
+      return String(
+        value ?? ''
+      )
+        .replaceAll(
+          '&',
+          '&amp;'
+        )
+        .replaceAll(
+          '<',
+          '&lt;'
+        )
+        .replaceAll(
+          '>',
+          '&gt;'
+        )
+        .replaceAll(
+          '"',
+          '&quot;'
+        )
+        .replaceAll(
+          "'",
+          '&#039;'
+        );
+    }
+
+    function money(value) {
+      return new Intl.NumberFormat(
+        'ru-RU'
+      ).format(
+        value
+      ) + ' ₸';
+    }
+
+    function serviceIcon(
+      category
+    ) {
+      if (
+        category ===
+        'педикюр'
+      ) {
+        return '🦶';
+      }
+
+      if (
+        category ===
+        'дизайн'
+      ) {
+        return '✨';
+      }
+
+      return '💅';
+    }
+
+    function productIcon(
+      category
+    ) {
+      if (
+        category ===
+        'уход'
+      ) {
+        return '🧴';
+      }
+
+      if (
+        category ===
+        'база'
+      ) {
+        return '◼';
+      }
+
+      return '💎';
+    }
+
+    function humanDate(
+      value
+    ) {
+      if (
+        !value
+      ) {
+        return '—';
+      }
+
+      const parts =
+        value.split('-');
+
+      if (
+        parts.length !== 3
+      ) {
+        return value;
+      }
+
+      return (
+        parts[2] +
+        '.' +
+        parts[1] +
+        '.' +
+        parts[0]
+      );
+    }
+
+    function actionIsFresh(
+      ui
+    ) {
+      if (
+        !ui ||
+        !ui.last_action_at
+      ) {
+        return false;
+      }
+
+      return (
+        Date.now() -
+        new Date(
+          ui.last_action_at
+        ).getTime()
+      ) < 1800;
+    }
+
+    function setGlow(
+      ui
+    ) {
+      const ids = [
+        'servicesPanel',
+        'slotsPanel',
+        'bookingPanel',
+        'productsPanel'
+      ];
+
+      ids.forEach(
+        function(id) {
+          document
+            .getElementById(id)
+            .classList
+            .remove('glow');
+        }
+      );
+
+      if (
+        !actionIsFresh(ui) ||
+        !ui.focus
+      ) {
+        return;
+      }
+
+      const map = {
+        services:
+          'servicesPanel',
+
+        slots:
+          'slotsPanel',
+
+        booking:
+          'bookingPanel',
+
+        products:
+          'productsPanel'
+      };
+
+      const id =
+        map[ui.focus];
+
+      if (
+        id
+      ) {
+        document
+          .getElementById(id)
+          .classList
+          .add('glow');
+      }
+    }
+
+    function renderServices(
+      data
+    ) {
+      document
+        .getElementById(
+          'services'
+        )
+        .innerHTML =
+        data.services
+          .map(
+            function(item) {
+              return (
+                '<div class="service">' +
+
+                '<div class="icon">' +
+                serviceIcon(
+                  item.category
+                ) +
+                '</div>' +
+
+                '<div>' +
+
+                '<div class="name">' +
+                esc(
+                  item.name
+                ) +
+                '</div>' +
+
+                '<div class="meta">' +
+                esc(
+                  item.duration_min
+                ) +
+                ' мин</div>' +
+
+                '</div>' +
+
+                '<div class="price">' +
+                money(
+                  item.price_kzt
+                ) +
+                '</div>' +
+
+                '</div>'
+              );
+            }
+          )
+          .join('');
+    }
+
+    function renderSlots(
+      data
+    ) {
+      document
+        .getElementById(
+          'displayDate'
+        )
+        .textContent =
+        humanDate(
+          data.display_date
+        );
+
+      document
+        .getElementById(
+          'slots'
+        )
+        .innerHTML =
+        data.slots
+          .map(
+            function(slot) {
+              return (
+                '<div class="slot ' +
+                (
+                  slot.occupied
+                    ? 'busy'
+                    : 'free'
+                ) +
+                '">' +
+
+                '<div>' +
+                esc(
+                  slot.time
+                ) +
+                '</div>' +
+
+                '<small>' +
+                (
+                  slot.occupied
+                    ? esc(
+                        slot.customer_name ||
+                        'Занято'
+                      )
+                    : 'Свободно'
+                ) +
+                '</small>' +
+
+                '</div>'
+              );
+            }
+          )
+          .join('');
+    }
+
+    function renderBooking(
+      data
+    ) {
+      const root =
+        document
+          .getElementById(
+            'booking'
+          );
+
+      const latest =
+        data.bookings &&
+        data.bookings.length
+          ? data.bookings[0]
+          : null;
+
+      if (
+        !latest
+      ) {
+        root.innerHTML =
+          '<div class="booking-empty">' +
+          'Пока нет записей.<br>' +
+          'Новая бронь появится здесь автоматически.' +
+          '</div>';
+
+        return;
+      }
+
+      const statusClass =
+        latest.status ===
+        'cancelled'
+          ? 'cancelled'
+          : 'confirmed';
+
+      const statusText =
+        latest.status ===
+        'cancelled'
+          ? 'Отменено'
+          : 'Подтверждено';
+
+      root.innerHTML =
+        '<div class="booking-card">' +
+
+        '<div class="booking-person">' +
+
+        '<div class="avatar">' +
+        '👤' +
+        '</div>' +
+
+        '<div>' +
+
+        '<div class="name" style="font-size:17px">' +
+        esc(
+          latest.customer_name
+        ) +
+        '</div>' +
+
+        '<div class="meta">' +
+        esc(
+          latest.booking_id
+        ) +
+        '</div>' +
+
+        '</div>' +
+
+        '</div>' +
+
+        '<div class="booking-main">' +
+
+        '<div>' +
+
+        '<div class="booking-service">' +
+        esc(
+          latest.service_name
+        ) +
+        '</div>' +
+
+        '<div class="booking-time">' +
+        '📅 ' +
+        humanDate(
+          latest.date
+        ) +
+        ' &nbsp;&nbsp; 🕒 ' +
+        esc(
+          latest.time
+        ) +
+        ' &nbsp;&nbsp; • ' +
+        money(
+          latest.price_kzt
+        ) +
+        '</div>' +
+
+        '</div>' +
+
+        '<div class="status ' +
+        statusClass +
+        '">' +
+        statusText +
+        '</div>' +
+
+        '</div>' +
+
+        '</div>';
+    }
+
+    function renderProducts(
+      data
+    ) {
+      const highlighted =
+        new Set(
+          (
+            data.ui &&
+            data.ui.product_ids
+          ) ||
+          []
+        );
+
+      document
+        .getElementById(
+          'products'
+        )
+        .innerHTML =
+        data.products
+          .map(
+            function(item) {
+
+              const highlightClass =
+                highlighted.has(
+                  item.id
+                ) &&
+                actionIsFresh(
+                  data.ui
+                )
+                  ? ' highlight'
+                  : '';
+
+              const stockClass =
+                item.stock > 0
+                  ? 'stock'
+                  : 'stock out';
+
+              const stockText =
+                item.stock > 0
+                  ? item.stock +
+                    ' шт.'
+                  : 'Нет в наличии';
+
+              return (
+                '<div class="product' +
+                highlightClass +
+                '">' +
+
+                '<div class="icon">' +
+                productIcon(
+                  item.category
+                ) +
+                '</div>' +
+
+                '<div>' +
+
+                '<div class="name">' +
+                esc(
+                  item.name
+                ) +
+                '</div>' +
+
+                '<div class="meta">' +
+                esc(
+                  item.category
+                ) +
+                '</div>' +
+
+                '</div>' +
+
+                '<div style="text-align:right">' +
+
+                '<div class="price">' +
+                money(
+                  item.price_kzt
+                ) +
+                '</div>' +
+
+                '<span class="' +
+                stockClass +
+                '">' +
+                esc(
+                  stockText
+                ) +
+                '</span>' +
+
+                '</div>' +
+
+                '</div>'
+              );
+            }
+          )
+          .join('');
+    }
+
+    let busy =
+      false;
+
+    async function refresh() {
+      if (
+        busy
+      ) {
+        return;
+      }
+
+      busy =
+        true;
+
+      try {
+        const response =
+          await fetch(
+            '/demo-data',
+            {
+              cache:
+                'no-store'
+            }
+          );
+
+        if (
+          !response.ok
+        ) {
+          throw new Error(
+            'HTTP ' +
+            response.status
+          );
+        }
+
+        const data =
+          await response.json();
+
+        renderServices(
+          data
+        );
+
+        renderSlots(
+          data
+        );
+
+        renderBooking(
+          data
+        );
+
+        renderProducts(
+          data
+        );
+
+        setGlow(
+          data.ui
+        );
+
+        document
+          .getElementById(
+            'updatedAt'
+          )
+          .textContent =
+          'Обновлено ' +
+          new Date(
+            data.generated_at
+          )
+          .toLocaleTimeString(
+            'ru-RU'
+          );
+
+      } catch (
+        error
+      ) {
+        document
+          .getElementById(
+            'updatedAt'
+          )
+          .textContent =
+          'Нет связи с сервером';
+
+      } finally {
+        busy =
+          false;
+      }
+    }
+
+    refresh();
+
+    setInterval(
+      refresh,
+      500
+    );
+  </script>
+
+</body>
+</html>`;
 
 const handler =
   createMcpHandler(
@@ -1061,12 +2804,22 @@ app.get(
   '/',
   async () => ({
     ok: true,
+
     service:
       'Yeti Nail Studio MCP Demo',
+
     version:
-      '1.3.0',
+      '1.4.0',
+
     mcp_endpoint:
       '/mcp',
+
+    demo:
+      '/demo',
+
+    demo_data:
+      '/demo-data',
+
     demo_bookings:
       '/bookings'
   })
@@ -1074,15 +2827,61 @@ app.get(
 
 app.get(
   '/bookings',
-  async () => ({
-    warning:
-      'Demo memory storage: data resets when the server restarts or sleeps.',
-    bookings
-  })
+  async (
+    request,
+    reply
+  ) => {
+    reply.header(
+      'Cache-Control',
+      'no-store'
+    );
+
+    return {
+      warning:
+        'Demo memory storage: data resets when the server restarts or sleeps.',
+
+      bookings
+    };
+  }
+);
+
+app.get(
+  '/demo-data',
+  async (
+    request,
+    reply
+  ) => {
+    reply.header(
+      'Cache-Control',
+      'no-store'
+    );
+
+    return buildDemoData();
+  }
+);
+
+app.get(
+  '/demo',
+  async (
+    request,
+    reply
+  ) => {
+    reply.header(
+      'Cache-Control',
+      'no-store'
+    );
+
+    reply.type(
+      'text/html; charset=utf-8'
+    );
+
+    return DEMO_HTML;
+  }
 );
 
 app.all(
   '/mcp',
+
   async (
     request,
     reply
@@ -1097,7 +2896,7 @@ app.all(
 const port =
   Number(
     process.env.PORT ||
-      3000
+    3000
   );
 
 await app.listen({
@@ -1106,5 +2905,5 @@ await app.listen({
 });
 
 console.log(
-  `Yeti Nail Studio MCP running on port ${port}`
+  \`Yeti Nail Studio MCP v1.4.0 running on port \${port}\`
 );
