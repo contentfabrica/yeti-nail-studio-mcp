@@ -3,6 +3,7 @@ import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 
 const services = [
   { id: 'manicure-classic', name: 'Маникюр «Жена миллионера»', category: 'маникюр', price_kzt: 8000, duration_min: 60 },
@@ -20,8 +21,6 @@ const products = [
   { id: 'base-strong-01', name: 'Крем для ног Сислей Фут Донт Кэр', category: 'уход', price_kzt: 5200, stock: 5 }
 ];
 
-// Human-friendly aliases are used only for search/voice matching.
-// Technical IDs above remain stable for dashboard highlighting and booking logic.
 const SERVICE_ALIASES = {
   'manicure-classic': [
     'жена миллионера',
@@ -193,13 +192,9 @@ function markUi(
   payload = {}
 ) {
   uiState.event_seq += 1;
-
-  uiState.last_action =
-    action;
-
+  uiState.last_action = action;
   uiState.last_action_at =
     new Date().toISOString();
-
   uiState.focus =
     focus ?? null;
 
@@ -266,19 +261,11 @@ function markUi(
   }
 
   uiEvents.push({
-    seq:
-      uiState.event_seq,
-
+    seq: uiState.event_seq,
     action,
-
-    focus:
-      uiState.focus,
-
-    at:
-      uiState.last_action_at,
-
-    payload:
-      { ...payload }
+    focus: uiState.focus,
+    at: uiState.last_action_at,
+    payload: { ...payload }
   });
 
   if (
@@ -1200,7 +1187,7 @@ function createServer() {
         'yeti-nail-studio-demo',
 
       version:
-        '1.6.1'
+        '1.7.0'
     });
 
   server.registerTool(
@@ -2909,8 +2896,8 @@ body{
   display:grid;
 
   grid-template-columns:
-    42px
-    1fr
+    88px
+    minmax(0,1fr)
     auto;
 
   gap:12px;
@@ -2989,12 +2976,12 @@ body{
 }
 
 .icon{
-  width:42px;
-  height:42px;
-  border-radius:13px;
+  width:88px;
+  height:88px;
+  border-radius:16px;
+  overflow:hidden;
   display:grid;
   place-items:center;
-  font-size:21px;
 
   background:
     linear-gradient(
@@ -3002,6 +2989,21 @@ body{
       rgba(255,79,157,.16),
       rgba(143,99,255,.16)
     );
+
+  border:
+    1px solid
+    rgba(255,255,255,.10);
+
+  box-shadow:
+    0 8px 22px
+    rgba(0,0,0,.22);
+}
+
+.icon img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
 }
 
 .name{
@@ -3521,43 +3523,65 @@ function money(value) {
 }
 
 function serviceIcon(
-  category
+  id
 ) {
-  if (
-    category ===
-    'педикюр'
-  ) {
-    return '🦶';
-  }
+  const images = {
+    'manicure-classic':
+      '/images/service_millionaire.png?v=170',
 
-  if (
-    category ===
-    'дизайн'
-  ) {
-    return '✨';
-  }
+    'manicure-gel':
+      '/images/service_ex_tears.png?v=170',
 
-  return '💅';
+    'pedicure-classic':
+      '/images/service_brutal.png?v=170',
+
+    'pedicure-gel':
+      '/images/service_sandals.png?v=170',
+
+    'nail-design':
+      '/images/service_full_meat.png?v=170'
+  };
+
+  const src =
+    images[id] ||
+    '';
+
+  return (
+    '<img src="' +
+    esc(src) +
+    '" alt="" loading="eager" decoding="async">'
+  );
 }
 
 function productIcon(
-  category
+  id
 ) {
-  if (
-    category ===
-    'уход'
-  ) {
-    return '🧴';
-  }
+  const images = {
+    'lak-red-01':
+      '/images/product_azature.png?v=170',
 
-  if (
-    category ===
-    'база'
-  ) {
-    return '◼';
-  }
+    'lak-red-02':
+      '/images/product_models.png?v=170',
 
-  return '💎';
+    'oil-cuticle-01':
+      '/images/product_chanel.png?v=170',
+
+    'cream-hand-01':
+      '/images/product_laprairie.png?v=170',
+
+    'base-strong-01':
+      '/images/product_sisley.png?v=170'
+  };
+
+  const src =
+    images[id] ||
+    '';
+
+  return (
+    '<img src="' +
+    esc(src) +
+    '" alt="" loading="eager" decoding="async">'
+  );
 }
 
 function humanDate(
@@ -3814,7 +3838,7 @@ function renderServices(
 
             '<div class="icon">' +
             serviceIcon(
-              item.category
+              item.id
             ) +
             '</div>' +
 
@@ -4145,7 +4169,7 @@ function renderProducts(
 
             '<div class="icon">' +
             productIcon(
-              item.category
+              item.id
             ) +
             '</div>' +
 
@@ -4372,7 +4396,7 @@ app.get(
       'Yeti Nail Studio MCP Demo',
 
     version:
-      '1.6.1',
+      '1.7.0',
 
     mcp_endpoint:
       '/mcp',
@@ -4382,6 +4406,9 @@ app.get(
 
     demo_screen:
       '/demo-screen',
+
+    images:
+      '/images/:filename',
 
     demo_data:
       '/demo-data',
@@ -4463,6 +4490,85 @@ app.get(
 );
 
 app.get(
+  '/images/:filename',
+
+  async (
+    request,
+    reply
+  ) => {
+    const allowedImages =
+      new Set([
+        'service_millionaire.png',
+        'service_ex_tears.png',
+        'service_brutal.png',
+        'service_sandals.png',
+        'service_full_meat.png',
+        'product_azature.png',
+        'product_models.png',
+        'product_chanel.png',
+        'product_laprairie.png',
+        'product_sisley.png'
+      ]);
+
+    const filename =
+      String(
+        request.params
+          ?.filename ??
+        ''
+      );
+
+    if (
+      !allowedImages.has(
+        filename
+      )
+    ) {
+      return reply
+        .code(404)
+        .send(
+          'Not found'
+        );
+    }
+
+    try {
+      const image =
+        await readFile(
+          new URL(
+            './public/images/' +
+            filename,
+            import.meta.url
+          )
+        );
+
+      reply.header(
+        'Cache-Control',
+        'public, max-age=31536000, immutable'
+      );
+
+      reply.type(
+        'image/png'
+      );
+
+      return image;
+
+    } catch (
+      error
+    ) {
+      request.log
+        ?.error?.(
+          error,
+          'Failed to load dashboard image'
+        );
+
+      return reply
+        .code(404)
+        .send(
+          'Not found'
+        );
+    }
+  }
+);
+
+app.get(
   '/demo',
 
   async (
@@ -4528,6 +4634,6 @@ await app.listen({
 });
 
 console.log(
-  'Yeti Nail Studio MCP v1.6.1 running on port ' +
+  'Yeti Nail Studio MCP v1.7.0 running on port ' +
   port
 );
