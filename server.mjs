@@ -5,24 +5,134 @@ import * as z from 'zod/v4';
 import { randomUUID } from 'node:crypto';
 
 const services = [
-  { id: 'manicure-classic', name: 'Классический маникюр', category: 'маникюр', price_kzt: 8000, duration_min: 60 },
-  { id: 'manicure-gel', name: 'Маникюр с гель-лаком', category: 'маникюр', price_kzt: 12000, duration_min: 90 },
-  { id: 'pedicure-classic', name: 'Классический педикюр', category: 'педикюр', price_kzt: 10000, duration_min: 75 },
-  { id: 'pedicure-gel', name: 'Педикюр с гель-лаком', category: 'педикюр', price_kzt: 14500, duration_min: 100 },
-  { id: 'nail-design', name: 'Дизайн ногтей', category: 'дизайн', price_kzt: 2500, duration_min: 30 }
+  { id: 'manicure-classic', name: 'Маникюр «Жена миллионера»', category: 'маникюр', price_kzt: 8000, duration_min: 60 },
+  { id: 'manicure-gel', name: 'Маникюр «Слёзы бывшего»', category: 'маникюр', price_kzt: 12000, duration_min: 90 },
+  { id: 'pedicure-classic', name: 'Педикюр «Брутальный уход»', category: 'педикюр', price_kzt: 10000, duration_min: 75 },
+  { id: 'pedicure-gel', name: 'Педикюр «Можно в сандальках»', category: 'педикюр', price_kzt: 14500, duration_min: 100 },
+  { id: 'nail-design', name: 'Комплекс «Полный фарш»', category: 'дизайн', price_kzt: 40000, duration_min: 30 }
 ];
 
 const products = [
-  { id: 'lak-red-01', name: 'Красный гель-лак Ruby 01', category: 'гель-лак', price_kzt: 4500, stock: 7 },
-  { id: 'lak-red-02', name: 'Красный гель-лак Cherry 07', category: 'гель-лак', price_kzt: 3900, stock: 3 },
-  { id: 'base-strong-01', name: 'Укрепляющая база Strong Base', category: 'база', price_kzt: 5200, stock: 5 },
-  { id: 'cream-hand-01', name: 'Крем для рук Silk Hands', category: 'уход', price_kzt: 3200, stock: 11 },
-  { id: 'oil-cuticle-01', name: 'Масло для кутикулы Almond Care', category: 'уход', price_kzt: 2800, stock: 0 }
+  { id: 'lak-red-01', name: 'Лак Азатюр Блэк Свэг Даймонд', category: 'лак', price_kzt: 4500, stock: 7 },
+  { id: 'lak-red-02', name: 'Лак Моделс Голден Слэй Дэй', category: 'лак', price_kzt: 3900, stock: 3 },
+  { id: 'oil-cuticle-01', name: 'Для кутикула Шанель Ванель Камелия', category: 'уход', price_kzt: 2800, stock: 0 },
+  { id: 'cream-hand-01', name: 'Крем для рук Ла Перди На Хэнд Крэм', category: 'уход', price_kzt: 3200, stock: 11 },
+  { id: 'base-strong-01', name: 'Крем для ног Сислей Фут Донт Кэр', category: 'уход', price_kzt: 5200, stock: 5 }
 ];
 
-const defaultSlots = ['10:00', '12:30', '15:00', '18:00', '19:30'];
+// Human-friendly aliases are used only for search/voice matching.
+// Technical IDs above remain stable for dashboard highlighting and booking logic.
+const SERVICE_ALIASES = {
+  'manicure-classic': [
+    'жена миллионера',
+    'маникюр жена миллионера',
+    'классический маникюр',
+    'маникюр классический'
+  ],
+
+  'manicure-gel': [
+    'слезы бывшего',
+    'маникюр слезы бывшего',
+    'маникюр с гель лаком',
+    'гель лак маникюр'
+  ],
+
+  'pedicure-classic': [
+    'брутальный уход',
+    'педикюр брутальный уход',
+    'классический педикюр',
+    'педикюр классический',
+    'мужской педикюр'
+  ],
+
+  'pedicure-gel': [
+    'можно в сандальках',
+    'педикюр можно в сандальках',
+    'можно в босоножки',
+    'педикюр можно в босоножки',
+    'педикюр с гель лаком',
+    'гель лак педикюр'
+  ],
+
+  'nail-design': [
+    'полный фарш',
+    'комплекс полный фарш',
+    'полный комплекс',
+    'дизайн ногтей',
+    'дизайн'
+  ]
+};
+
+const PRODUCT_ALIASES = {
+  'lak-red-01': [
+    'азатюр',
+    'азатюр блэк даймонд',
+    'азатюр блэк свэг даймонд',
+    'azature black diamond',
+    'black diamond',
+    'ruby',
+    'ruby 01',
+    'руби'
+  ],
+
+  'lak-red-02': [
+    'моделс',
+    'моделс оун',
+    'голд раш',
+    'голден слэй дэй',
+    'models own',
+    'models own gold rush couture',
+    'gold rush couture',
+    'cherry',
+    'cherry 07',
+    'черри'
+  ],
+
+  'oil-cuticle-01': [
+    'шанель',
+    'шанель камелия',
+    'шанель ванель камелия',
+    'chanel',
+    'chanel l huile camelia',
+    'l huile camelia',
+    'масло для кутикулы',
+    'средство для кутикулы',
+    'almond care'
+  ],
+
+  'cream-hand-01': [
+    'ла прери',
+    'ла перди',
+    'la prairie',
+    'la prairie cellular hand cream',
+    'крем для рук',
+    'hand cream',
+    'silk hands'
+  ],
+
+  'base-strong-01': [
+    'сислей',
+    'сислей фут',
+    'sisley',
+    'sisley paris restructuring care for feet',
+    'крем для ног',
+    'foot care',
+    'strong base'
+  ]
+};
+
+const defaultSlots = [
+  '10:00',
+  '12:30',
+  '15:00',
+  '18:00',
+  '19:30'
+];
+
 const bookings = [];
-const BUSINESS_TIME_ZONE = 'Asia/Almaty';
+
+const BUSINESS_TIME_ZONE =
+  'Asia/Almaty';
 
 const uiState = {
   event_seq: 0,
@@ -41,14 +151,28 @@ const uiEvents = [];
 
 function textResult(obj) {
   return {
-    content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }],
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          obj,
+          null,
+          2
+        )
+      }
+    ],
     structuredContent: obj
   };
 }
 
 function errorResult(message) {
   return {
-    content: [{ type: 'text', text: message }],
+    content: [
+      {
+        type: 'text',
+        text: message
+      }
+    ],
     isError: true
   };
 }
@@ -63,211 +187,747 @@ function normalize(value = '') {
     .replace(/\s+/g, ' ');
 }
 
-function markUi(action, focus, payload = {}) {
+function markUi(
+  action,
+  focus,
+  payload = {}
+) {
   uiState.event_seq += 1;
-  uiState.last_action = action;
-  uiState.last_action_at = new Date().toISOString();
-  uiState.focus = focus ?? null;
 
-  if (focus !== 'products') uiState.product_ids = [];
-  if (focus !== 'services') uiState.service_ids = [];
+  uiState.last_action =
+    action;
 
-  if (payload.selected_date !== undefined) uiState.selected_date = payload.selected_date;
-  if (payload.selected_service_id !== undefined) uiState.selected_service_id = payload.selected_service_id;
-  if (payload.selected_time !== undefined) uiState.selected_time = payload.selected_time;
-  if (payload.touched_booking_id !== undefined) uiState.touched_booking_id = payload.touched_booking_id;
-  if (payload.product_ids !== undefined) uiState.product_ids = payload.product_ids;
-  if (payload.service_ids !== undefined) uiState.service_ids = payload.service_ids;
+  uiState.last_action_at =
+    new Date().toISOString();
+
+  uiState.focus =
+    focus ?? null;
+
+  if (
+    focus !==
+    'products'
+  ) {
+    uiState.product_ids = [];
+  }
+
+  if (
+    focus !==
+    'services'
+  ) {
+    uiState.service_ids = [];
+  }
+
+  if (
+    payload.selected_date !==
+    undefined
+  ) {
+    uiState.selected_date =
+      payload.selected_date;
+  }
+
+  if (
+    payload.selected_service_id !==
+    undefined
+  ) {
+    uiState.selected_service_id =
+      payload.selected_service_id;
+  }
+
+  if (
+    payload.selected_time !==
+    undefined
+  ) {
+    uiState.selected_time =
+      payload.selected_time;
+  }
+
+  if (
+    payload.touched_booking_id !==
+    undefined
+  ) {
+    uiState.touched_booking_id =
+      payload.touched_booking_id;
+  }
+
+  if (
+    payload.product_ids !==
+    undefined
+  ) {
+    uiState.product_ids =
+      payload.product_ids;
+  }
+
+  if (
+    payload.service_ids !==
+    undefined
+  ) {
+    uiState.service_ids =
+      payload.service_ids;
+  }
 
   uiEvents.push({
-    seq: uiState.event_seq,
+    seq:
+      uiState.event_seq,
+
     action,
-    focus: uiState.focus,
-    at: uiState.last_action_at,
-    payload: { ...payload }
+
+    focus:
+      uiState.focus,
+
+    at:
+      uiState.last_action_at,
+
+    payload:
+      { ...payload }
   });
 
-  if (uiEvents.length > 25) uiEvents.shift();
+  if (
+    uiEvents.length >
+    25
+  ) {
+    uiEvents.shift();
+  }
 }
 
-const QUERY_STOP_WORDS = new Set([
-  'а','и','или','ну','тогда','пожалуйста','сейчас','какие','какой','какая','какое','что','есть','ли','у','вас','мне','меня',
-  'покажи','показать','подскажи','расскажи','сколько','стоит','цена','цены','по','на','в','из','для','все','весь','вся',
-  'услуги','услуга','товары','товар','продукты','продукт','каталог','ассортимент','доступно','доступны','имеются','наличие',
-  'наличии','остаток','остатки','осталось','штук','шт','дешевле','дороже','самый','самая','самое','вариант','варианты','можно',
-  'купить','хочу','запиши','записать','запись','сделать','приду','приеду'
-]);
+const QUERY_STOP_WORDS =
+  new Set([
+    'а',
+    'и',
+    'или',
+    'ну',
+    'тогда',
+    'пожалуйста',
+    'сейчас',
+    'какие',
+    'какой',
+    'какая',
+    'какое',
+    'что',
+    'есть',
+    'ли',
+    'у',
+    'вас',
+    'мне',
+    'меня',
+    'покажи',
+    'показать',
+    'подскажи',
+    'расскажи',
+    'сколько',
+    'стоит',
+    'цена',
+    'цены',
+    'по',
+    'на',
+    'в',
+    'из',
+    'для',
+    'все',
+    'весь',
+    'вся',
+    'услуги',
+    'услуга',
+    'товары',
+    'товар',
+    'продукты',
+    'продукт',
+    'каталог',
+    'ассортимент',
+    'доступно',
+    'доступны',
+    'имеются',
+    'наличие',
+    'наличии',
+    'остаток',
+    'остатки',
+    'осталось',
+    'штук',
+    'шт',
+    'дешевле',
+    'дороже',
+    'самый',
+    'самая',
+    'самое',
+    'вариант',
+    'варианты',
+    'можно',
+    'купить',
+    'хочу',
+    'запиши',
+    'записать',
+    'запись',
+    'сделать',
+    'приду',
+    'приеду'
+  ]);
 
-function meaningfulQueryTerms(value) {
+function meaningfulQueryTerms(
+  value
+) {
   return normalize(value)
     .split(/\s+/)
     .filter(Boolean)
-    .filter(term => !QUERY_STOP_WORDS.has(term));
+    .filter(
+      term =>
+        !QUERY_STOP_WORDS.has(
+          term
+        )
+    );
 }
 
-function isGenericServiceQuery(value) {
-  return ['', 'все', 'услуги', 'все услуги', 'прайс', 'прайс лист', 'каталог', 'ассортимент'].includes(normalize(value));
+function isGenericServiceQuery(
+  value
+) {
+  return [
+    '',
+    'все',
+    'услуги',
+    'все услуги',
+    'прайс',
+    'прайс лист',
+    'каталог',
+    'ассортимент'
+  ].includes(
+    normalize(value)
+  );
 }
 
-function isGenericProductQuery(value) {
-  return ['', 'все', 'товары', 'все товары', 'продукты', 'все продукты', 'каталог', 'ассортимент'].includes(normalize(value));
+function isGenericProductQuery(
+  value
+) {
+  return [
+    '',
+    'все',
+    'товары',
+    'все товары',
+    'продукты',
+    'все продукты',
+    'каталог',
+    'ассортимент'
+  ].includes(
+    normalize(value)
+  );
 }
 
-function resolveServiceReference(service_id, service_query, fallbackId = null) {
-  if (service_id) {
-    const byId = services.find(s => s.id === service_id);
+function serviceSearchText(
+  service
+) {
+  return normalize(
+    [
+      service.name,
+      service.category,
+      ...(
+        SERVICE_ALIASES[
+          service.id
+        ] ||
+        []
+      )
+    ].join(' ')
+  );
+}
+
+function productSearchText(
+  product
+) {
+  return normalize(
+    [
+      product.name,
+      product.category,
+      ...(
+        PRODUCT_ALIASES[
+          product.id
+        ] ||
+        []
+      )
+    ].join(' ')
+  );
+}
+
+function serviceAliasMatches(
+  service,
+  q
+) {
+  return (
+    SERVICE_ALIASES[
+      service.id
+    ] ||
+    []
+  ).some(
+    alias =>
+      normalize(alias) ===
+      q
+  );
+}
+
+function productAliasMatches(
+  product,
+  q
+) {
+  return (
+    PRODUCT_ALIASES[
+      product.id
+    ] ||
+    []
+  ).some(
+    alias =>
+      normalize(alias) ===
+      q
+  );
+}
+
+function resolveServiceReference(
+  service_id,
+  service_query,
+  fallbackId = null
+) {
+  if (
+    service_id
+  ) {
+    const byId =
+      services.find(
+        s =>
+          s.id ===
+          service_id
+      );
+
     return byId
-      ? { service: byId }
-      : { error: 'Unknown service_id. Call get_services or provide service_query.' };
+      ? {
+          service:
+            byId
+        }
+      : {
+          error:
+            'Unknown service_id. Call get_services or provide service_query.'
+        };
   }
 
-  const q = normalize(service_query);
+  const q =
+    normalize(
+      service_query
+    );
 
-  if (!q && fallbackId) {
-    const fallback = services.find(s => s.id === fallbackId);
-    if (fallback) return { service: fallback };
+  if (
+    !q &&
+    fallbackId
+  ) {
+    const fallback =
+      services.find(
+        s =>
+          s.id ===
+          fallbackId
+      );
+
+    if (
+      fallback
+    ) {
+      return {
+        service:
+          fallback
+      };
+    }
   }
 
-  if (!q) {
-    return { error: 'Provide service_id or service_query.' };
+  if (
+    !q
+  ) {
+    return {
+      error:
+        'Provide service_id or service_query.'
+    };
   }
 
-  let matches = services.filter(
-    s =>
-      normalize(s.name) === q ||
-      normalize(s.id) === q
-  );
+  let matches =
+    services.filter(
+      s =>
+        normalize(
+          s.name
+        ) === q ||
+        normalize(
+          s.id
+        ) === q ||
+        serviceAliasMatches(
+          s,
+          q
+        )
+    );
 
-  if (matches.length === 1) {
-    return { service: matches[0] };
+  if (
+    matches.length ===
+    1
+  ) {
+    return {
+      service:
+        matches[0]
+    };
   }
 
-  matches = services.filter(
-    s =>
-      normalize(s.name).includes(q) ||
-      normalize(s.category).includes(q)
-  );
+  matches =
+    services.filter(
+      s =>
+        serviceSearchText(
+          s
+        ).includes(q)
+    );
 
-  if (matches.length === 1) {
-    return { service: matches[0] };
+  if (
+    matches.length ===
+    1
+  ) {
+    return {
+      service:
+        matches[0]
+    };
   }
 
-  const terms = meaningfulQueryTerms(service_query);
+  const terms =
+    meaningfulQueryTerms(
+      service_query
+    );
 
-  matches = services.filter(s => {
-    const hay = normalize(s.name + ' ' + s.category);
-    return terms.every(term => hay.includes(term));
-  });
+  matches =
+    services.filter(
+      s => {
+        const hay =
+          serviceSearchText(
+            s
+          );
 
-  if (matches.length === 1) {
-    return { service: matches[0] };
+        return terms.every(
+          term =>
+            hay.includes(
+              term
+            )
+        );
+      }
+    );
+
+  if (
+    matches.length ===
+    1
+  ) {
+    return {
+      service:
+        matches[0]
+    };
   }
 
-  if (matches.length > 1) {
+  if (
+    matches.length >
+    1
+  ) {
     return {
       error:
         'Service request is ambiguous. Matches: ' +
         matches
-          .map(s => s.name + ' (' + s.id + ')')
+          .map(
+            s =>
+              s.name +
+              ' (' +
+              s.id +
+              ')'
+          )
           .join(', ')
     };
   }
 
   return {
-    error: 'No service matched "' + service_query + '".'
+    error:
+      'No service matched "' +
+      service_query +
+      '".'
   };
 }
 
-function resolveProductReference(product_id, product_query) {
-  if (product_id) {
-    const byId = products.find(p => p.id === product_id);
+function resolveProductReference(
+  product_id,
+  product_query
+) {
+  if (
+    product_id
+  ) {
+    const byId =
+      products.find(
+        p =>
+          p.id ===
+          product_id
+      );
 
     return byId
-      ? { product: byId }
-      : { error: 'Unknown product_id. Call search_products or provide product_query.' };
+      ? {
+          product:
+            byId
+        }
+      : {
+          error:
+            'Unknown product_id. Call search_products or provide product_query.'
+        };
   }
 
-  const q = normalize(product_query);
+  const q =
+    normalize(
+      product_query
+    );
 
-  if (!q) {
-    return { error: 'Provide product_id or product_query.' };
+  if (
+    !q
+  ) {
+    return {
+      error:
+        'Provide product_id or product_query.'
+    };
   }
 
-  let matches = products.filter(
-    p =>
-      normalize(p.name) === q ||
-      normalize(p.id) === q
-  );
+  let matches =
+    products.filter(
+      p =>
+        normalize(
+          p.name
+        ) === q ||
+        normalize(
+          p.id
+        ) === q ||
+        productAliasMatches(
+          p,
+          q
+        )
+    );
 
-  if (matches.length === 1) {
-    return { product: matches[0] };
+  if (
+    matches.length ===
+    1
+  ) {
+    return {
+      product:
+        matches[0]
+    };
   }
 
-  matches = products.filter(
-    p => normalize(p.name).includes(q)
-  );
+  matches =
+    products.filter(
+      p =>
+        productSearchText(
+          p
+        ).includes(q)
+    );
 
-  if (matches.length === 1) {
-    return { product: matches[0] };
+  if (
+    matches.length ===
+    1
+  ) {
+    return {
+      product:
+        matches[0]
+    };
   }
 
-  const terms = meaningfulQueryTerms(product_query);
+  const terms =
+    meaningfulQueryTerms(
+      product_query
+    );
 
-  matches = products.filter(p => {
-    const hay = normalize(p.name + ' ' + p.category);
-    return terms.every(term => hay.includes(term));
-  });
+  matches =
+    products.filter(
+      p => {
+        const hay =
+          productSearchText(
+            p
+          );
 
-  if (matches.length === 1) {
-    return { product: matches[0] };
+        return terms.every(
+          term =>
+            hay.includes(
+              term
+            )
+        );
+      }
+    );
+
+  if (
+    matches.length ===
+    1
+  ) {
+    return {
+      product:
+        matches[0]
+    };
   }
 
-  if (matches.length > 1) {
+  if (
+    matches.length >
+    1
+  ) {
     return {
       error:
         'Product request is ambiguous. Matches: ' +
         matches
-          .map(p => p.name + ' (' + p.id + ')')
+          .map(
+            p =>
+              p.name +
+              ' (' +
+              p.id +
+              ')'
+          )
           .join(', ')
     };
   }
 
   return {
-    error: 'No product matched "' + product_query + '".'
+    error:
+      'No product matched "' +
+      product_query +
+      '".'
   };
 }
 
-function getBusinessDate(offsetDays = 0) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: BUSINESS_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(new Date());
+function getBusinessDate(
+  offsetDays = 0
+) {
+  const parts =
+    new Intl
+      .DateTimeFormat(
+        'en-CA',
+        {
+          timeZone:
+            BUSINESS_TIME_ZONE,
 
-  const values = Object.fromEntries(
-    parts.map(part => [part.type, part.value])
-  );
+          year:
+            'numeric',
 
-  const baseUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day)
-  );
+          month:
+            '2-digit',
+
+          day:
+            '2-digit'
+        }
+      )
+      .formatToParts(
+        new Date()
+      );
+
+  const values =
+    Object.fromEntries(
+      parts.map(
+        part => [
+          part.type,
+          part.value
+        ]
+      )
+    );
+
+  const baseUtc =
+    Date.UTC(
+      Number(
+        values.year
+      ),
+
+      Number(
+        values.month
+      ) - 1,
+
+      Number(
+        values.day
+      )
+    );
 
   return new Date(
-    baseUtc + offsetDays * 86400000
-  ).toISOString().slice(0, 10);
+    baseUtc +
+    offsetDays *
+    86400000
+  )
+    .toISOString()
+    .slice(
+      0,
+      10
+    );
 }
 
-function resolveBookingDate(date_type, exact_date) {
-  if (date_type === 'today') return getBusinessDate(0);
-  if (date_type === 'tomorrow') return getBusinessDate(1);
+function isValidIsoDate(
+  value
+) {
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})$/
+      .exec(
+        String(
+          value ??
+          ''
+        )
+      );
 
   if (
-    date_type === 'exact' &&
-    exact_date &&
-    /^\d{4}-\d{2}-\d{2}$/.test(exact_date)
+    !match
+  ) {
+    return false;
+  }
+
+  const year =
+    Number(
+      match[1]
+    );
+
+  const month =
+    Number(
+      match[2]
+    );
+
+  const day =
+    Number(
+      match[3]
+    );
+
+  const date =
+    new Date(0);
+
+  date.setUTCFullYear(
+    year,
+    month - 1,
+    day
+  );
+
+  date.setUTCHours(
+    0,
+    0,
+    0,
+    0
+  );
+
+  return (
+    date.getUTCFullYear() ===
+      year &&
+    date.getUTCMonth() ===
+      month - 1 &&
+    date.getUTCDate() ===
+      day
+  );
+}
+
+function resolveBookingDate(
+  date_type,
+  exact_date
+) {
+  if (
+    date_type ===
+    'today'
+  ) {
+    return getBusinessDate(
+      0
+    );
+  }
+
+  if (
+    date_type ===
+    'tomorrow'
+  ) {
+    return getBusinessDate(
+      1
+    );
+  }
+
+  if (
+    date_type ===
+      'exact' &&
+    isValidIsoDate(
+      exact_date
+    )
   ) {
     return exact_date;
   }
@@ -280,13 +940,19 @@ function resolveBookingDateWithFallback(
   exact_date,
   fallbackDate = null
 ) {
-  if (date_type) {
-    return resolveBookingDate(date_type, exact_date);
+  if (
+    date_type
+  ) {
+    return resolveBookingDate(
+      date_type,
+      exact_date
+    );
   }
 
   if (
-    fallbackDate &&
-    /^\d{4}-\d{2}-\d{2}$/.test(fallbackDate)
+    isValidIsoDate(
+      fallbackDate
+    )
   ) {
     return fallbackDate;
   }
@@ -294,51 +960,108 @@ function resolveBookingDateWithFallback(
   return null;
 }
 
-function findBookingById(booking_id) {
+function getRescheduleFallbackDate(
+  booking
+) {
+  if (
+    uiState.last_action ===
+      'slots_checked' &&
+    isValidIsoDate(
+      uiState.selected_date
+    )
+  ) {
+    return uiState.selected_date;
+  }
+
+  return booking.date;
+}
+
+function findBookingById(
+  booking_id
+) {
   return bookings.find(
-    b => b.booking_id === booking_id
+    b =>
+      b.booking_id ===
+      booking_id
   );
 }
 
-function isSlotOccupied(date, time, excludeBookingId = null) {
+function isSlotOccupied(
+  date,
+  time,
+  excludeBookingId = null
+) {
   return bookings.some(
     b =>
-      b.booking_id !== excludeBookingId &&
-      b.date === date &&
-      b.time === time &&
-      b.status === 'confirmed'
+      b.booking_id !==
+        excludeBookingId &&
+      b.date ===
+        date &&
+      b.time ===
+        time &&
+      b.status ===
+        'confirmed'
   );
 }
 
-function findConfirmedBookingsByCustomer(customer_name) {
-  const q = normalize(customer_name);
+function findConfirmedBookingsByCustomer(
+  customer_name
+) {
+  const q =
+    normalize(
+      customer_name
+    );
 
   return bookings.filter(
     b =>
-      normalize(b.customer_name) === q &&
-      b.status === 'confirmed'
+      normalize(
+        b.customer_name
+      ) === q &&
+      b.status ===
+        'confirmed'
   );
 }
 
-function resolveTargetBooking(booking_id, customer_name) {
-  if (booking_id) {
-    const booking = findBookingById(booking_id);
+function resolveTargetBooking(
+  booking_id,
+  customer_name
+) {
+  if (
+    booking_id
+  ) {
+    const booking =
+      findBookingById(
+        booking_id
+      );
 
     return booking
-      ? { booking }
-      : { error: 'Unknown booking_id.' };
+      ? {
+          booking
+        }
+      : {
+          error:
+            'Unknown booking_id.'
+        };
   }
 
-  if (!customer_name) {
+  if (
+    !customer_name
+  ) {
     return {
-      error: 'Provide booking_id or customer_name.'
+      error:
+        'Provide booking_id or customer_name.'
     };
   }
 
   const matches =
-    findConfirmedBookingsByCustomer(customer_name);
+    findConfirmedBookingsByCustomer(
+      customer_name
+    );
 
-  if (matches.length === 0) {
+  if (
+    matches.length ===
+    0
+  ) {
     return {
       error:
         'No confirmed booking found for ' +
@@ -347,7 +1070,10 @@ function resolveTargetBooking(booking_id, customer_name) {
     };
   }
 
-  if (matches.length > 1) {
+  if (
+    matches.length >
+    1
+  ) {
     return {
       error:
         'More than one confirmed booking found for ' +
@@ -357,138 +1083,213 @@ function resolveTargetBooking(booking_id, customer_name) {
   }
 
   return {
-    booking: matches[0]
+    booking:
+      matches[0]
   };
 }
 
-function latestBookingFirst(list) {
-  return [...list].sort((a, b) => {
-    const ta = new Date(
-      a.updated_at ||
-      a.cancelled_at ||
-      a.created_at ||
-      0
-    ).getTime();
+function latestBookingFirst(
+  list
+) {
+  return [
+    ...list
+  ].sort(
+    (
+      a,
+      b
+    ) => {
+      const ta =
+        new Date(
+          a.updated_at ||
+          a.cancelled_at ||
+          a.created_at ||
+          0
+        ).getTime();
 
-    const tb = new Date(
-      b.updated_at ||
-      b.cancelled_at ||
-      b.created_at ||
-      0
-    ).getTime();
+      const tb =
+        new Date(
+          b.updated_at ||
+          b.cancelled_at ||
+          b.created_at ||
+          0
+        ).getTime();
 
-    return tb - ta;
-  });
+      return tb - ta;
+    }
+  );
 }
 
 function buildDemoData() {
   const displayDate =
     uiState.selected_date ||
-    getBusinessDate(1);
-
-  const slots = defaultSlots.map(time => {
-    const booking = bookings.find(
-      b =>
-        b.date === displayDate &&
-        b.time === time &&
-        b.status === 'confirmed'
+    getBusinessDate(
+      1
     );
 
-    return {
-      time,
-      occupied: Boolean(booking),
-      customer_name:
-        booking?.customer_name ?? null,
-      booking_id:
-        booking?.booking_id ?? null
-    };
-  });
+  const slots =
+    defaultSlots.map(
+      time => {
+        const booking =
+          bookings.find(
+            b =>
+              b.date ===
+                displayDate &&
+              b.time ===
+                time &&
+              b.status ===
+                'confirmed'
+          );
+
+        return {
+          time,
+
+          occupied:
+            Boolean(
+              booking
+            ),
+
+          customer_name:
+            booking
+              ?.customer_name ??
+            null,
+
+          booking_id:
+            booking
+              ?.booking_id ??
+            null
+        };
+      }
+    );
 
   return {
-    service: 'Yeti Nail Studio',
-    timezone: BUSINESS_TIME_ZONE,
-    generated_at: new Date().toISOString(),
-    display_date: displayDate,
+    service:
+      'Yeti Nail Studio',
+
+    timezone:
+      BUSINESS_TIME_ZONE,
+
+    generated_at:
+      new Date()
+        .toISOString(),
+
+    display_date:
+      displayDate,
+
     services,
+
     slots,
+
     bookings:
-      latestBookingFirst(bookings),
+      latestBookingFirst(
+        bookings
+      ),
+
     products,
-    ui: { ...uiState }
+
+    ui:
+      {
+        ...uiState
+      }
   };
 }
 
 function createServer() {
-  const server = new McpServer({
-    name: 'yeti-nail-studio-demo',
-    version: '1.6.0'
-  });
+  const server =
+    new McpServer({
+      name:
+        'yeti-nail-studio-demo',
+
+      version:
+        '1.6.1'
+    });
 
   server.registerTool(
     'get_services',
     {
       description:
-        'ALWAYS call this tool for questions about salon services, service names, categories, prices, durations, manicure, pedicure, nail design, or what services are offered. Use query for a specific service or category. Leave query empty for the full service list. Never answer service catalog or current price questions from memory when this tool is available.',
+        'ALWAYS call this tool for questions about salon services, service names, categories, prices, durations, manicure, pedicure, the Полный фарш complex, or what services are offered. Use query for a specific service or category. Leave query empty for the full service list. Never answer service catalog or current price questions from memory when this tool is available.',
 
-      inputSchema: z.object({
-        query: z
-          .string()
-          .optional()
-          .describe(
-            'Optional service name or category, for example классический маникюр, маникюр, педикюр, дизайн. Leave empty for all services.'
-          ),
+      inputSchema:
+        z.object({
+          query:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Optional service name or category, for example Жена миллионера, Слёзы бывшего, Брутальный уход, Можно в сандальках, Полный фарш, маникюр or педикюр. Leave empty for all services.'
+              ),
 
-        category: z
-          .string()
-          .optional()
-          .describe(
-            'Legacy optional category. Prefer query. Kept for compatibility.'
-          )
-      })
+          category:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Legacy optional category. Prefer query. Kept for compatibility.'
+              )
+        })
     },
 
-    async ({ query, category }) => {
+    async ({
+      query,
+      category
+    }) => {
       const raw =
         query ??
         category ??
         '';
 
       const q =
-        normalize(raw);
+        normalize(
+          raw
+        );
 
       const terms =
-        meaningfulQueryTerms(raw);
+        meaningfulQueryTerms(
+          raw
+        );
 
       let list;
 
       if (
-        isGenericServiceQuery(raw) ||
-        terms.length === 0
+        isGenericServiceQuery(
+          raw
+        ) ||
+        terms.length ===
+          0
       ) {
-        list = services;
+        list =
+          services;
       } else {
-        list = services.filter(
-          s =>
-            normalize(s.name).includes(q) ||
-            normalize(s.category).includes(q)
-        );
-
-        if (list.length === 0) {
-          list = services.filter(
-            s => {
-              const hay =
-                normalize(
-                  s.name +
-                  ' ' +
-                  s.category
-                );
-
-              return terms.every(
-                term =>
-                  hay.includes(term)
-              );
-            }
+        list =
+          services.filter(
+            s =>
+              serviceSearchText(
+                s
+              ).includes(
+                q
+              )
           );
+
+        if (
+          list.length ===
+          0
+        ) {
+          list =
+            services.filter(
+              s => {
+                const hay =
+                  serviceSearchText(
+                    s
+                  );
+
+                return terms.every(
+                  term =>
+                    hay.includes(
+                      term
+                    )
+                );
+              }
+            );
         }
       }
 
@@ -502,15 +1303,19 @@ function createServer() {
             ),
 
           selected_service_id:
-            list.length === 1
+            list.length ===
+              1
               ? list[0].id
               : null
         }
       );
 
       return textResult({
-        currency: 'KZT',
-        services: list
+        currency:
+          'KZT',
+
+        services:
+          list
       });
     }
   );
@@ -521,49 +1326,55 @@ function createServer() {
       description:
         'Use this tool when the user asks which appointment times are free, available, or asks you to suggest a time. Do NOT call it again just before create_booking when the user has already selected an exact slot; create_booking performs its own final availability check. Relative dates should use today or tomorrow. The tool can also remember the selected service and date for the next booking turn.',
 
-      inputSchema: z.object({
-        date_type: z
-          .enum([
-            'today',
-            'tomorrow',
-            'exact'
-          ])
-          .describe(
-            'Use today for сегодня, tomorrow for завтра, and exact only when the user explicitly gives a calendar date.'
-          ),
+      inputSchema:
+        z.object({
+          date_type:
+            z
+              .enum([
+                'today',
+                'tomorrow',
+                'exact'
+              ])
+              .describe(
+                'Use today for сегодня, tomorrow for завтра, and exact only when the user explicitly gives a calendar date.'
+              ),
 
-        exact_date: z
-          .string()
-          .optional()
-          .describe(
-            'YYYY-MM-DD only when date_type is exact. Leave empty for today or tomorrow.'
-          ),
+          exact_date:
+            z
+              .string()
+              .optional()
+              .describe(
+                'YYYY-MM-DD only when date_type is exact. Leave empty for today or tomorrow.'
+              ),
 
-        service_id: z
-          .string()
-          .optional()
-          .describe(
-            'Optional service id from get_services.'
-          ),
+          service_id:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Optional service id from get_services.'
+              ),
 
-        service_query: z
-          .string()
-          .optional()
-          .describe(
-            'Optional natural service name such as классический маникюр or классический педикюр when service_id is not known.'
-          ),
+          service_query:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Optional natural service name such as Жена миллионера, Брутальный уход, Можно в сандальках or Полный фарш when service_id is not known.'
+              ),
 
-        time_of_day: z
-          .enum([
-            'morning',
-            'afternoon',
-            'evening'
-          ])
-          .optional()
-          .describe(
-            'Optional preferred part of day.'
-          )
-      })
+          time_of_day:
+            z
+              .enum([
+                'morning',
+                'afternoon',
+                'evening'
+              ])
+              .optional()
+              .describe(
+                'Optional preferred part of day.'
+              )
+        })
     },
 
     async ({
@@ -579,13 +1390,16 @@ function createServer() {
           exact_date
         );
 
-      if (!date) {
+      if (
+        !date
+      ) {
         return errorResult(
-          'Invalid appointment date. Use today, tomorrow, or an explicit YYYY-MM-DD date.'
+          'Invalid appointment date. Use today, tomorrow, or a real YYYY-MM-DD calendar date.'
         );
       }
 
-      let selectedService = null;
+      let selectedService =
+        null;
 
       if (
         service_id ||
@@ -597,7 +1411,9 @@ function createServer() {
             service_query
           );
 
-        if (resolvedService.error) {
+        if (
+          resolvedService.error
+        ) {
           return errorResult(
             resolvedService.error
           );
@@ -620,29 +1436,38 @@ function createServer() {
         time_of_day ===
         'morning'
       ) {
-        slots = slots.filter(
-          t => t < '12:00'
-        );
+        slots =
+          slots.filter(
+            t =>
+              t <
+              '12:00'
+          );
       }
 
       if (
         time_of_day ===
         'afternoon'
       ) {
-        slots = slots.filter(
-          t =>
-            t >= '12:00' &&
-            t < '18:00'
-        );
+        slots =
+          slots.filter(
+            t =>
+              t >=
+                '12:00' &&
+              t <
+                '18:00'
+          );
       }
 
       if (
         time_of_day ===
         'evening'
       ) {
-        slots = slots.filter(
-          t => t >= '18:00'
-        );
+        slots =
+          slots.filter(
+            t =>
+              t >=
+              '18:00'
+          );
       }
 
       markUi(
@@ -653,12 +1478,17 @@ function createServer() {
             date,
 
           selected_service_id:
-            selectedService?.id ??
-            uiState.selected_service_id,
+            selectedService
+              ?.id ??
+            uiState
+              .selected_service_id,
 
           service_ids:
             selectedService
-              ? [selectedService.id]
+              ? [
+                  selectedService
+                    .id
+                ]
               : []
         }
       );
@@ -670,10 +1500,12 @@ function createServer() {
           selectedService
             ? {
                 id:
-                  selectedService.id,
+                  selectedService
+                    .id,
 
                 name:
-                  selectedService.name
+                  selectedService
+                    .name
               }
             : null,
 
@@ -689,55 +1521,62 @@ function createServer() {
       description:
         'ALWAYS call this tool when the user clearly asks to book or make a NEW appointment and customer name, service, date, and time are known either from the current message or from the immediately preceding booking conversation. Reuse the date/service just selected in the previous availability turn instead of forcing the user to repeat them. Do NOT call check_available_slots again when an exact slot was already chosen; this tool performs its own final slot validation. Do not use for moving or cancelling an existing booking.',
 
-      inputSchema: z.object({
-        customer_name: z
-          .string()
-          .min(1)
-          .describe(
-            'Customer name exactly as the user provided it or as already known in the current conversation.'
-          ),
+      inputSchema:
+        z.object({
+          customer_name:
+            z
+              .string()
+              .min(1)
+              .describe(
+                'Customer name exactly as the user provided it or as already known in the current conversation.'
+              ),
 
-        service_id: z
-          .string()
-          .optional()
-          .describe(
-            'Optional service id from get_services. If omitted, use service_query or the service selected in the immediately preceding turn.'
-          ),
+          service_id:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Optional service id from get_services. If omitted, use service_query or the service selected in the immediately preceding turn.'
+              ),
 
-        service_query: z
-          .string()
-          .optional()
-          .describe(
-            'Optional natural service name such as классический маникюр or классический педикюр when service_id is not known.'
-          ),
+          service_query:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Optional natural service name such as Жена миллионера, Слёзы бывшего, Брутальный уход, Можно в сандальках or Полный фарш when service_id is not known.'
+              ),
 
-        date_type: z
-          .enum([
-            'today',
-            'tomorrow',
-            'exact'
-          ])
-          .optional()
-          .describe(
-            'Use today for сегодня, tomorrow for завтра, exact for an explicit date. May be omitted only when continuing immediately from a check_available_slots result; the server will reuse that selected date.'
-          ),
+          date_type:
+            z
+              .enum([
+                'today',
+                'tomorrow',
+                'exact'
+              ])
+              .optional()
+              .describe(
+                'Use today for сегодня, tomorrow for завтра, exact for an explicit date. May be omitted only when continuing immediately from a check_available_slots result; the server will reuse that selected date.'
+              ),
 
-        exact_date: z
-          .string()
-          .optional()
-          .describe(
-            'YYYY-MM-DD only when date_type is exact.'
-          ),
+          exact_date:
+            z
+              .string()
+              .optional()
+              .describe(
+                'YYYY-MM-DD only when date_type is exact.'
+              ),
 
-        time: z
-          .string()
-          .regex(
-            /^([01]\d|2[0-3]):[0-5]\d$/
-          )
-          .describe(
-            'Appointment time in HH:MM format.'
-          )
-      })
+          time:
+            z
+              .string()
+              .regex(
+                /^([01]\d|2[0-3]):[0-5]\d$/
+              )
+              .describe(
+                'Appointment time in HH:MM format.'
+              )
+        })
     },
 
     async ({
@@ -755,9 +1594,11 @@ function createServer() {
           uiState.selected_date
         );
 
-      if (!date) {
+      if (
+        !date
+      ) {
         return errorResult(
-          'Appointment date is missing. Provide today, tomorrow, an exact date, or check available slots first.'
+          'Appointment date is missing or invalid. Provide today, tomorrow, a real exact date, or check available slots first.'
         );
       }
 
@@ -768,7 +1609,9 @@ function createServer() {
           uiState.selected_service_id
         );
 
-      if (resolvedService.error) {
+      if (
+        resolvedService.error
+      ) {
         return errorResult(
           resolvedService.error
         );
@@ -778,7 +1621,9 @@ function createServer() {
         resolvedService.service;
 
       if (
-        !defaultSlots.includes(time)
+        !defaultSlots.includes(
+          time
+        )
       ) {
         return errorResult(
           'Time ' +
@@ -806,7 +1651,10 @@ function createServer() {
         booking_id:
           'BK-' +
           randomUUID()
-            .slice(0, 8)
+            .slice(
+              0,
+              8
+            )
             .toUpperCase(),
 
         customer_name,
@@ -818,6 +1666,7 @@ function createServer() {
           service.name,
 
         date,
+
         time,
 
         price_kzt:
@@ -855,7 +1704,9 @@ function createServer() {
             time,
 
           service_ids:
-            [service.id],
+            [
+              service.id
+            ],
 
           touched_booking_id:
             booking.booking_id
@@ -874,25 +1725,28 @@ function createServer() {
       description:
         'Find existing salon bookings for a customer. Use this BEFORE rescheduling or cancelling when the user refers to my booking, my appointment, move my appointment, change the time, or cancel my appointment. Use the returned booking_id with reschedule_booking or cancel_booking.',
 
-      inputSchema: z.object({
-        customer_name: z
-          .string()
-          .min(1)
-          .describe(
-            'Customer name exactly as known from the conversation'
-          ),
+      inputSchema:
+        z.object({
+          customer_name:
+            z
+              .string()
+              .min(1)
+              .describe(
+                'Customer name exactly as known from the conversation'
+              ),
 
-        status: z
-          .enum([
-            'confirmed',
-            'cancelled',
-            'all'
-          ])
-          .optional()
-          .describe(
-            'Default confirmed. Use all only when history is needed.'
-          )
-      })
+          status:
+            z
+              .enum([
+                'confirmed',
+                'cancelled',
+                'all'
+              ])
+              .optional()
+              .describe(
+                'Default confirmed. Use all only when history is needed.'
+              )
+        })
     },
 
     async ({
@@ -913,7 +1767,8 @@ function createServer() {
         );
 
       if (
-        status !== 'all'
+        status !==
+        'all'
       ) {
         list =
           list.filter(
@@ -923,41 +1778,57 @@ function createServer() {
           );
       }
 
-      const first =
+      list =
         latestBookingFirst(
           list
-        )[0] ?? null;
+        );
+
+      const first =
+        list[0] ??
+        null;
 
       markUi(
         'booking_checked',
         'booking',
         {
           selected_date:
-            first?.date ??
-            uiState.selected_date,
+            first
+              ?.date ??
+            uiState
+              .selected_date,
 
           selected_service_id:
-            first?.service_id ??
-            uiState.selected_service_id,
+            first
+              ?.service_id ??
+            uiState
+              .selected_service_id,
 
           selected_time:
-            first?.time ??
-            uiState.selected_time,
+            first
+              ?.time ??
+            uiState
+              .selected_time,
 
           service_ids:
-            first?.service_id
-              ? [first.service_id]
+            first
+              ?.service_id
+              ? [
+                  first.service_id
+                ]
               : [],
 
           touched_booking_id:
-            first?.booking_id ??
+            first
+              ?.booking_id ??
             null
         }
       );
 
       return textResult({
         customer_name,
-        bookings: list
+
+        bookings:
+          list
       });
     }
   );
@@ -966,43 +1837,49 @@ function createServer() {
     'reschedule_booking',
     {
       description:
-        'Move an EXISTING confirmed booking to a new date and/or time while keeping the same booking_id. ALWAYS use this when the user says move, change, reschedule, switch the time/date, or changed their mind about an existing appointment. Reuse the date from the immediately preceding availability check if new_date_type is omitted. Do not create a second booking. If the user asks for TWO OR MORE dependent booking changes in the same message, use process_booking_changes instead.',
+        'Move an EXISTING confirmed booking to a new date and/or time while keeping the same booking_id. ALWAYS use this when the user says move, change, reschedule, switch the time/date, or changed their mind about an existing appointment. If only the date changes, omit new_time and the current time is preserved. If only the time changes, omit new_date_type and the current booking date is preserved. If check_available_slots was called immediately before this tool, its selected date may be reused. Do not create a second booking. If the user asks for TWO OR MORE dependent booking changes in the same message, use process_booking_changes instead.',
 
-      inputSchema: z.object({
-        booking_id: z
-          .string()
-          .min(1)
-          .describe(
-            'Existing booking id returned by get_customer_bookings.'
-          ),
+      inputSchema:
+        z.object({
+          booking_id:
+            z
+              .string()
+              .min(1)
+              .describe(
+                'Existing booking id returned by get_customer_bookings.'
+              ),
 
-        new_date_type: z
-          .enum([
-            'today',
-            'tomorrow',
-            'exact'
-          ])
-          .optional()
-          .describe(
-            'Use today for сегодня, tomorrow for завтра, exact for an explicit date. May be omitted only when immediately reusing the date from check_available_slots.'
-          ),
+          new_date_type:
+            z
+              .enum([
+                'today',
+                'tomorrow',
+                'exact'
+              ])
+              .optional()
+              .describe(
+                'Optional new date. Use today for сегодня, tomorrow for завтра, exact for an explicit date. If omitted, keep the current booking date unless immediately reusing a date from check_available_slots.'
+              ),
 
-        new_exact_date: z
-          .string()
-          .optional()
-          .describe(
-            'YYYY-MM-DD only when new_date_type is exact.'
-          ),
+          new_exact_date:
+            z
+              .string()
+              .optional()
+              .describe(
+                'YYYY-MM-DD only when new_date_type is exact.'
+              ),
 
-        new_time: z
-          .string()
-          .regex(
-            /^([01]\d|2[0-3]):[0-5]\d$/
-          )
-          .describe(
-            'New appointment time in HH:MM format.'
-          )
-      })
+          new_time:
+            z
+              .string()
+              .regex(
+                /^([01]\d|2[0-3]):[0-5]\d$/
+              )
+              .optional()
+              .describe(
+                'Optional new appointment time in HH:MM format. If omitted, keep the current booking time.'
+              )
+        })
     },
 
     async ({
@@ -1016,7 +1893,9 @@ function createServer() {
           booking_id
         );
 
-      if (!booking) {
+      if (
+        !booking
+      ) {
         return errorResult(
           'Unknown booking_id. Call get_customer_bookings first.'
         );
@@ -1037,31 +1916,50 @@ function createServer() {
         resolveBookingDateWithFallback(
           new_date_type,
           new_exact_date,
-          uiState.selected_date
+          getRescheduleFallbackDate(
+            booking
+          )
         );
 
-      if (!newDate) {
+      if (
+        !newDate
+      ) {
         return errorResult(
-          'New appointment date is missing. Provide today, tomorrow, an exact date, or check available slots first.'
+          'New appointment date is invalid. Provide today, tomorrow, a real exact date, or check available slots first.'
         );
       }
 
+      const targetTime =
+        new_time ??
+        booking.time;
+
       if (
         !defaultSlots.includes(
-          new_time
+          targetTime
         )
       ) {
         return errorResult(
           'Time ' +
-          new_time +
+          targetTime +
           ' is not an offered slot.'
+        );
+      }
+
+      if (
+        newDate ===
+          booking.date &&
+        targetTime ===
+          booking.time
+      ) {
+        return errorResult(
+          'The requested date and time are the same as the current booking.'
         );
       }
 
       if (
         isSlotOccupied(
           newDate,
-          new_time,
+          targetTime,
           booking_id
         )
       ) {
@@ -1069,7 +1967,7 @@ function createServer() {
           'Slot ' +
           newDate +
           ' ' +
-          new_time +
+          targetTime +
           ' is already occupied. Choose another available slot.'
         );
       }
@@ -1086,7 +1984,7 @@ function createServer() {
         newDate;
 
       booking.time =
-        new_time;
+        targetTime;
 
       booking.updated_at =
         new Date()
@@ -1103,10 +2001,12 @@ function createServer() {
             booking.service_id,
 
           selected_time:
-            new_time,
+            targetTime,
 
           service_ids:
-            [booking.service_id],
+            [
+              booking.service_id
+            ],
 
           touched_booking_id:
             booking.booking_id
@@ -1116,7 +2016,9 @@ function createServer() {
       return textResult({
         action:
           'rescheduled',
+
         previous,
+
         booking
       });
     }
@@ -1128,14 +2030,16 @@ function createServer() {
       description:
         'Cancel an EXISTING confirmed salon booking. ALWAYS use this when the user clearly asks to cancel or remove an existing appointment. Use get_customer_bookings first only when the correct booking_id is not already known. If the user asks for TWO OR MORE dependent booking changes in the same message, use process_booking_changes instead.',
 
-      inputSchema: z.object({
-        booking_id: z
-          .string()
-          .min(1)
-          .describe(
-            'Existing booking id returned by get_customer_bookings.'
-          )
-      })
+      inputSchema:
+        z.object({
+          booking_id:
+            z
+              .string()
+              .min(1)
+              .describe(
+                'Existing booking id returned by get_customer_bookings.'
+              )
+        })
     },
 
     async ({
@@ -1146,7 +2050,9 @@ function createServer() {
           booking_id
         );
 
-      if (!booking) {
+      if (
+        !booking
+      ) {
         return errorResult(
           'Unknown booking_id. Call get_customer_bookings first.'
         );
@@ -1187,7 +2093,9 @@ function createServer() {
             booking.time,
 
           service_ids:
-            [booking.service_id],
+            [
+              booking.service_id
+            ],
 
           touched_booking_id:
             booking.booking_id
@@ -1197,6 +2105,7 @@ function createServer() {
       return textResult({
         action:
           'cancelled',
+
         booking
       });
     }
@@ -1208,62 +2117,69 @@ function createServer() {
       description:
         'Execute TWO OR MORE dependent changes to the SAME existing booking in the exact order requested by the user, inside one server-side workflow. Example: reschedule to 15:00 and then cancel. Use this instead of separate reschedule_booking/cancel_booking calls when multiple dependent changes are requested in ONE user message. The server executes actions sequentially and stops if a step fails.',
 
-      inputSchema: z.object({
-        booking_id: z
-          .string()
-          .optional()
-          .describe(
-            'Existing booking id if known. Prefer this when available.'
-          ),
+      inputSchema:
+        z.object({
+          booking_id:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Existing booking id if known. Prefer this when available.'
+              ),
 
-        customer_name: z
-          .string()
-          .optional()
-          .describe(
-            'Customer name. Used to locate the booking when booking_id is not known. This works automatically only when the customer has exactly one confirmed booking.'
-          ),
+          customer_name:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Customer name. Used to locate the booking when booking_id is not known. This works automatically only when the customer has exactly one confirmed booking.'
+              ),
 
-        actions: z
-          .array(
-            z.enum([
-              'reschedule',
-              'cancel'
-            ])
-          )
-          .min(2)
-          .max(4)
-          .describe(
-            'Ordered list of actions exactly as requested by the user. Example: ["reschedule", "cancel"].'
-          ),
+          actions:
+            z
+              .array(
+                z.enum([
+                  'reschedule',
+                  'cancel'
+                ])
+              )
+              .min(2)
+              .max(4)
+              .describe(
+                'Ordered list of actions exactly as requested by the user. Example: ["reschedule", "cancel"].'
+              ),
 
-        new_date_type: z
-          .enum([
-            'today',
-            'tomorrow',
-            'exact'
-          ])
-          .optional()
-          .describe(
-            'Used when actions contains reschedule. May be omitted only when immediately reusing a date from check_available_slots.'
-          ),
+          new_date_type:
+            z
+              .enum([
+                'today',
+                'tomorrow',
+                'exact'
+              ])
+              .optional()
+              .describe(
+                'Used when actions contains reschedule. May be omitted when keeping the current booking date or immediately reusing a date from check_available_slots.'
+              ),
 
-        new_exact_date: z
-          .string()
-          .optional()
-          .describe(
-            'YYYY-MM-DD only when new_date_type is exact.'
-          ),
+          new_exact_date:
+            z
+              .string()
+              .optional()
+              .describe(
+                'YYYY-MM-DD only when new_date_type is exact.'
+              ),
 
-        new_time: z
-          .string()
-          .regex(
-            /^([01]\d|2[0-3]):[0-5]\d$/
-          )
-          .optional()
-          .describe(
-            'Required when actions contains reschedule. New time in HH:MM format.'
-          )
-      })
+          new_time:
+            z
+              .string()
+              .regex(
+                /^([01]\d|2[0-3]):[0-5]\d$/
+              )
+              .optional()
+              .describe(
+                'Required when actions contains reschedule. New time in HH:MM format.'
+              )
+        })
     },
 
     async ({
@@ -1323,7 +2239,9 @@ function createServer() {
             );
           }
 
-          if (!new_time) {
+          if (
+            !new_time
+          ) {
             return errorResult(
               'Reschedule step requires new_time.'
             );
@@ -1333,12 +2251,16 @@ function createServer() {
             resolveBookingDateWithFallback(
               new_date_type,
               new_exact_date,
-              uiState.selected_date
+              getRescheduleFallbackDate(
+                booking
+              )
             );
 
-          if (!newDate) {
+          if (
+            !newDate
+          ) {
             return errorResult(
-              'Reschedule date is missing. Provide today, tomorrow, an exact date, or check available slots first.'
+              'Reschedule date is invalid. Provide today, tomorrow, a real exact date, or check available slots first.'
             );
           }
 
@@ -1452,7 +2374,9 @@ function createServer() {
             booking.time,
 
           service_ids:
-            [booking.service_id],
+            [
+              booking.service_id
+            ],
 
           touched_booking_id:
             booking.booking_id
@@ -1462,7 +2386,9 @@ function createServer() {
       return textResult({
         action:
           'workflow_completed',
+
         steps,
+
         booking
       });
     }
@@ -1472,24 +2398,27 @@ function createServer() {
     'search_products',
     {
       description:
-        'ALWAYS call this tool for questions about salon retail products, product names, categories, colors, prices, recommendations, cheaper alternatives, or what products are available. Leave query empty for the full catalog. For a specific stock question, check_product_stock may be used directly with product_query. Do not answer current product catalog or price questions from memory when this tool is available.',
+        'ALWAYS call this tool for questions about salon retail products, product names, categories, prices, recommendations, cheaper alternatives, or what products are available. Leave query empty for the full catalog. For a specific stock question, check_product_stock may be used directly with product_query. Do not answer current product catalog or price questions from memory when this tool is available.',
 
-      inputSchema: z.object({
-        query: z
-          .string()
-          .optional()
-          .describe(
-            'Optional product name, color, or category, for example красный лак, Ruby, крем. Leave empty for all products.'
-          ),
+      inputSchema:
+        z.object({
+          query:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Optional product name or category, for example Азатюр, Голден Слэй, Шанель Камелия, крем для рук, крем для ног or лак. Leave empty for all products.'
+              ),
 
-        max_price_kzt: z
-          .number()
-          .positive()
-          .optional()
-          .describe(
-            'Optional maximum price in KZT.'
-          )
-      })
+          max_price_kzt:
+            z
+              .number()
+              .positive()
+              .optional()
+              .describe(
+                'Optional maximum price in KZT.'
+              )
+        })
     },
 
     async ({
@@ -1497,45 +2426,54 @@ function createServer() {
       max_price_kzt
     }) => {
       const q =
-        normalize(query);
+        normalize(
+          query
+        );
 
       const terms =
-        meaningfulQueryTerms(query);
+        meaningfulQueryTerms(
+          query
+        );
 
       let list;
 
       if (
-        isGenericProductQuery(query) ||
-        terms.length === 0
+        isGenericProductQuery(
+          query
+        ) ||
+        terms.length ===
+          0
       ) {
-        list = products;
+        list =
+          products;
       } else {
         list =
           products.filter(
             p =>
-              normalize(
-                p.name +
-                ' ' +
-                p.category
-              ).includes(q)
+              productSearchText(
+                p
+              ).includes(
+                q
+              )
           );
 
         if (
-          list.length === 0
+          list.length ===
+          0
         ) {
           list =
             products.filter(
               p => {
                 const hay =
-                  normalize(
-                    p.name +
-                    ' ' +
-                    p.category
+                  productSearchText(
+                    p
                   );
 
                 return terms.every(
                   term =>
-                    hay.includes(term)
+                    hay.includes(
+                      term
+                    )
                 );
               }
             );
@@ -1579,23 +2517,26 @@ function createServer() {
     'check_product_stock',
     {
       description:
-        'ALWAYS call this tool when the user asks whether a specific salon product is in stock, available, sold out, how many units remain, or asks for the current stock of a specific product. You may pass either product_id or a natural product_query such as Ruby, Cherry, Almond Care, красный гель лак. Do not require a separate search_products call first when the product can be identified directly.',
+        'ALWAYS call this tool when the user asks whether a specific salon product is in stock, available, sold out, how many units remain, or asks for the current stock of a specific product. You may pass either product_id or a natural product_query such as Азатюр, Голден Слэй, Шанель Камелия, Ла Перди or Сислей Фут. Do not require a separate search_products call first when the product can be identified directly.',
 
-      inputSchema: z.object({
-        product_id: z
-          .string()
-          .optional()
-          .describe(
-            'Optional product id from search_products.'
-          ),
+      inputSchema:
+        z.object({
+          product_id:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Optional product id from search_products.'
+              ),
 
-        product_query: z
-          .string()
-          .optional()
-          .describe(
-            'Optional natural product name or query when product_id is not known, for example Ruby, Almond Care, укрепляющая база.'
-          )
-      })
+          product_query:
+            z
+              .string()
+              .optional()
+              .describe(
+                'Optional natural product name or query when product_id is not known, for example Азатюр, Голден Слэй, Шанель Камелия, крем для рук or крем для ног.'
+              )
+        })
     },
 
     async ({
@@ -1624,7 +2565,9 @@ function createServer() {
         'products',
         {
           product_ids:
-            [product.id]
+            [
+              product.id
+            ]
         }
       );
 
@@ -1632,7 +2575,8 @@ function createServer() {
         ...product,
 
         in_stock:
-          product.stock > 0,
+          product.stock >
+          0,
 
         currency:
           'KZT'
@@ -1645,12 +2589,22 @@ function createServer() {
 
 const DEMO_HTML = `<!doctype html>
 <html lang="ru">
+
 <head>
+
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Yeti Nail Studio — Live Demo</title>
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1"
+>
+
+<title>
+  Yeti Nail Studio — Live Demo
+</title>
 
 <style>
+
 :root{
   --bg:#070812;
   --panel:#111323;
@@ -1784,7 +2738,9 @@ body{
   width:9px;
   height:9px;
   border-radius:50%;
-  background:var(--green);
+
+  background:
+    var(--green);
 
   box-shadow:
     0 0 15px
@@ -1886,8 +2842,13 @@ body{
   font-size:12px;
   padding:7px 10px;
   border-radius:10px;
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.035);
+
+  border:
+    1px solid
+    var(--line);
+
+  background:
+    rgba(255,255,255,.035);
 
   transition:
     color .2s ease,
@@ -2371,7 +3332,9 @@ body{
     padding:9px 12px;
   }
 }
+
 </style>
+
 </head>
 
 <body>
@@ -2415,9 +3378,11 @@ body{
     >
 
       <div class="panel-title">
+
         <h2>
           УСЛУГИ
         </h2>
+
       </div>
 
       <div
@@ -2505,7 +3470,9 @@ body{
       Данные обновляются автоматически
     </span>
 
-    <span id="updatedAt">
+    <span
+      id="updatedAt"
+    >
       —
     </span>
 
@@ -2516,7 +3483,10 @@ body{
 <script>
 
 function esc(value) {
-  return String(value ?? '')
+  return String(
+    value ??
+    ''
+  )
     .replaceAll(
       '&',
       '&amp;'
@@ -2540,14 +3510,19 @@ function esc(value) {
 }
 
 function money(value) {
-  return new Intl.NumberFormat(
-    'ru-RU'
-  ).format(
-    value
-  ) + ' ₸';
+  return new Intl
+    .NumberFormat(
+      'ru-RU'
+    )
+    .format(
+      value
+    ) +
+    ' ₸';
 }
 
-function serviceIcon(category) {
+function serviceIcon(
+  category
+) {
   if (
     category ===
     'педикюр'
@@ -2565,7 +3540,9 @@ function serviceIcon(category) {
   return '💅';
 }
 
-function productIcon(category) {
+function productIcon(
+  category
+) {
   if (
     category ===
     'уход'
@@ -2583,16 +3560,23 @@ function productIcon(category) {
   return '💎';
 }
 
-function humanDate(value) {
-  if (!value) {
+function humanDate(
+  value
+) {
+  if (
+    !value
+  ) {
     return '—';
   }
 
   const parts =
-    value.split('-');
+    value.split(
+      '-'
+    );
 
   if (
-    parts.length !== 3
+    parts.length !==
+    3
   ) {
     return value;
   }
@@ -2649,7 +3633,9 @@ let previousSlotState =
 let slotFlashUntil =
   new Map();
 
-function syncUiAction(ui) {
+function syncUiAction(
+  ui
+) {
   const seq =
     Number(
       ui &&
@@ -2718,7 +3704,9 @@ function syncUiAction(ui) {
   }
 }
 
-function actionIsFresh(ui) {
+function actionIsFresh(
+  ui
+) {
   return (
     Boolean(ui) &&
     Date.now() <
@@ -2726,7 +3714,9 @@ function actionIsFresh(ui) {
   );
 }
 
-function setGlow(ui) {
+function setGlow(
+  ui
+) {
   [
     'servicesPanel',
     'slotsPanel',
@@ -2735,14 +3725,20 @@ function setGlow(ui) {
   ].forEach(
     function(id) {
       document
-        .getElementById(id)
+        .getElementById(
+          id
+        )
         .classList
-        .remove('glow');
+        .remove(
+          'glow'
+        );
     }
   );
 
   if (
-    !actionIsFresh(ui) ||
+    !actionIsFresh(
+      ui
+    ) ||
     !ui.focus
   ) {
     return;
@@ -2763,17 +3759,27 @@ function setGlow(ui) {
   };
 
   const id =
-    map[ui.focus];
+    map[
+      ui.focus
+    ];
 
-  if (id) {
+  if (
+    id
+  ) {
     document
-      .getElementById(id)
+      .getElementById(
+        id
+      )
       .classList
-      .add('glow');
+      .add(
+        'glow'
+      );
   }
 }
 
-function renderServices(data) {
+function renderServices(
+  data
+) {
   document
     .getElementById(
       'services'
@@ -2785,11 +3791,14 @@ function renderServices(data) {
           const highlighted =
             data.ui &&
             Array.isArray(
-              data.ui.service_ids
+              data.ui
+                .service_ids
             ) &&
-            data.ui.service_ids.includes(
-              item.id
-            ) &&
+            data.ui
+              .service_ids
+              .includes(
+                item.id
+              ) &&
             actionIsFresh(
               data.ui
             );
@@ -2838,7 +3847,9 @@ function renderServices(data) {
       .join('');
 }
 
-function renderSlots(data) {
+function renderSlots(
+  data
+) {
   const chip =
     document
       .getElementById(
@@ -2851,7 +3862,8 @@ function renderSlots(data) {
     );
 
   if (
-    previousDisplayDate !== null &&
+    previousDisplayDate !==
+      null &&
     previousDisplayDate !==
       data.display_date
   ) {
@@ -2863,12 +3875,14 @@ function renderSlots(data) {
   previousDisplayDate =
     data.display_date;
 
-  chip.classList.toggle(
-    'date-flash',
+  chip
+    .classList
+    .toggle(
+      'date-flash',
 
-    Date.now() <
+      Date.now() <
       dateFlashUntil
-  );
+    );
 
   document
     .getElementById(
@@ -2884,35 +3898,41 @@ function renderSlots(data) {
             slot.time;
 
           const previous =
-            previousSlotState.get(
-              key
-            );
+            previousSlotState
+              .get(
+                key
+              );
 
           if (
-            previous !== undefined &&
-            previous !== slot.occupied
+            previous !==
+              undefined &&
+            previous !==
+              slot.occupied
           ) {
-            slotFlashUntil.set(
-              key,
+            slotFlashUntil
+              .set(
+                key,
 
-              Date.now() +
-              UI_FLASH_MS
-            );
+                Date.now() +
+                UI_FLASH_MS
+              );
           }
 
           const changed =
             (
-              slotFlashUntil.get(
-                key
-              ) ||
+              slotFlashUntil
+                .get(
+                  key
+                ) ||
               0
             ) >
             Date.now();
 
-          previousSlotState.set(
-            key,
-            slot.occupied
-          );
+          previousSlotState
+            .set(
+              key,
+              slot.occupied
+            );
 
           return (
             '<div class="slot ' +
@@ -2938,7 +3958,8 @@ function renderSlots(data) {
             (
               slot.occupied
                 ? esc(
-                    slot.customer_name ||
+                    slot
+                      .customer_name ||
                     'Занято'
                   )
                 : 'Свободно'
@@ -2952,7 +3973,9 @@ function renderSlots(data) {
       .join('');
 }
 
-function renderBooking(data) {
+function renderBooking(
+  data
+) {
   const root =
     document
       .getElementById(
@@ -2965,7 +3988,9 @@ function renderBooking(data) {
       ? data.bookings[0]
       : null;
 
-  if (!latest) {
+  if (
+    !latest
+  ) {
     root.innerHTML =
       '<div class="booking-empty">' +
       'Пока нет записей.<br>' +
@@ -2977,13 +4002,13 @@ function renderBooking(data) {
 
   const statusClass =
     latest.status ===
-    'cancelled'
+      'cancelled'
       ? 'cancelled'
       : 'confirmed';
 
   const statusText =
     latest.status ===
-    'cancelled'
+      'cancelled'
       ? 'Отменено'
       : 'Подтверждено';
 
@@ -3052,7 +4077,9 @@ function renderBooking(data) {
     '</div>';
 }
 
-function renderProducts(data) {
+function renderProducts(
+  data
+) {
   const highlighted =
     new Set(
       (
@@ -3084,7 +4111,8 @@ function renderProducts(data) {
               : '';
 
           const stockClass =
-            item.stock > 0
+            item.stock >
+            0
               ? 'stock'
               : 'stock out';
 
@@ -3104,7 +4132,8 @@ function renderProducts(data) {
               : '';
 
           const stockText =
-            item.stock > 0
+            item.stock >
+            0
               ? item.stock +
                 ' шт.'
               : 'Нет в наличии';
@@ -3168,7 +4197,9 @@ let busy =
   false;
 
 async function refresh() {
-  if (busy) {
+  if (
+    busy
+  ) {
     return;
   }
 
@@ -3230,9 +4261,9 @@ async function refresh() {
       new Date(
         data.generated_at
       )
-      .toLocaleTimeString(
-        'ru-RU'
-      );
+        .toLocaleTimeString(
+          'ru-RU'
+        );
 
   } catch (
     error
@@ -3260,36 +4291,45 @@ setInterval(
 </script>
 
 </body>
+
 </html>`;
 
 const DEMO_SCREEN_HTML =
   DEMO_HTML.replace(
     '</head>',
+
     `
 <style>
+
   html,
   body {
-    background: transparent !important;
+    background:
+      transparent
+      !important;
   }
 
   body {
-    padding: 14px !important;
+    padding:
+      14px
+      !important;
   }
 
-.shell {
-  filter:
-    saturate(1.35)
-    contrast(1.12)
-    brightness(0.90);
-}
-  
+  .shell {
+    filter:
+      saturate(1.35)
+      contrast(1.12)
+      brightness(0.90);
+  }
+
 </style>
+
 </head>`
   );
 
 const handler =
   createMcpHandler(
-    () => createServer()
+    () =>
+      createServer()
   );
 
 const nodeHandler =
@@ -3323,20 +4363,25 @@ const app =
 
 app.get(
   '/',
+
   async () => ({
-    ok: true,
+    ok:
+      true,
 
     service:
       'Yeti Nail Studio MCP Demo',
 
     version:
-      '1.6.0',
+      '1.6.1',
 
     mcp_endpoint:
       '/mcp',
 
     demo:
       '/demo',
+
+    demo_screen:
+      '/demo-screen',
 
     demo_data:
       '/demo-data',
@@ -3351,6 +4396,7 @@ app.get(
 
 app.get(
   '/debug-ui',
+
   async (
     request,
     reply
@@ -3362,11 +4408,14 @@ app.get(
 
     return {
       ui:
-        { ...uiState },
+        {
+          ...uiState
+        },
 
       recent_events:
-        [...uiEvents]
-          .reverse(),
+        [
+          ...uiEvents
+        ].reverse(),
 
       bookings:
         latestBookingFirst(
@@ -3378,6 +4427,7 @@ app.get(
 
 app.get(
   '/bookings',
+
   async (
     request,
     reply
@@ -3398,6 +4448,7 @@ app.get(
 
 app.get(
   '/demo-data',
+
   async (
     request,
     reply
@@ -3413,6 +4464,7 @@ app.get(
 
 app.get(
   '/demo',
+
   async (
     request,
     reply
@@ -3432,6 +4484,7 @@ app.get(
 
 app.get(
   '/demo-screen',
+
   async (
     request,
     reply
@@ -3475,6 +4528,6 @@ await app.listen({
 });
 
 console.log(
-  'Yeti Nail Studio MCP v1.6.0 running on port ' +
+  'Yeti Nail Studio MCP v1.6.1 running on port ' +
   port
 );
