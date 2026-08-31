@@ -3275,6 +3275,14 @@ const DEMO_SCREEN_HTML =
   body {
     padding: 14px !important;
   }
+
+.shell {
+  filter:
+    saturate(1.35)
+    contrast(1.12)
+    brightness(0.90);
+}
+  
 </style>
 </head>`
   );
