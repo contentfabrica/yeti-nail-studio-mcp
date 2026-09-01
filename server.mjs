@@ -67,11 +67,15 @@ const PRODUCT_ALIASES = {
     'азатюр',
     'азатюр блэк даймонд',
     'азатюр блэк свэг даймонд',
+
+    'черный',
+    'черный лак',
+    'черный лак для ногтей',
+    'black',
+    'black polish',
+
     'azature black diamond',
-    'black diamond',
-    'ruby',
-    'ruby 01',
-    'руби'
+    'black diamond'
   ],
 
   'lak-red-02': [
@@ -79,12 +83,19 @@ const PRODUCT_ALIASES = {
     'моделс оун',
     'голд раш',
     'голден слэй дэй',
+
+    'золотой',
+    'золотой лак',
+    'золотой лак для ногтей',
+    'желтый',
+    'желтый лак',
+    'gold',
+    'golden',
+    'gold polish',
+
     'models own',
     'models own gold rush couture',
-    'gold rush couture',
-    'cherry',
-    'cherry 07',
-    'черри'
+    'gold rush couture'
   ],
 
   'oil-cuticle-01': [
@@ -95,8 +106,7 @@ const PRODUCT_ALIASES = {
     'chanel l huile camelia',
     'l huile camelia',
     'масло для кутикулы',
-    'средство для кутикулы',
-    'almond care'
+    'средство для кутикулы'
   ],
 
   'cream-hand-01': [
@@ -105,8 +115,7 @@ const PRODUCT_ALIASES = {
     'la prairie',
     'la prairie cellular hand cream',
     'крем для рук',
-    'hand cream',
-    'silk hands'
+    'hand cream'
   ],
 
   'base-strong-01': [
@@ -115,8 +124,7 @@ const PRODUCT_ALIASES = {
     'sisley',
     'sisley paris restructuring care for feet',
     'крем для ног',
-    'foot care',
-    'strong base'
+    'foot care'
   ]
 };
 
@@ -2385,7 +2393,7 @@ function createServer() {
     'search_products',
     {
       description:
-        'ALWAYS call this tool for questions about salon retail products, product names, categories, prices, recommendations, cheaper alternatives, or what products are available. Leave query empty for the full catalog. For a specific stock question, check_product_stock may be used directly with product_query. Do not answer current product catalog or price questions from memory when this tool is available.',
+  'ALWAYS call this tool for questions about salon retail products, product names, colors, categories, prices, recommendations, cheaper alternatives, or what products are available. IMPORTANT: preserve distinguishing words from the user request. For example, if the user says "черный лак", pass query="черный лак"; if the user says "золотой лак", pass query="золотой лак". Never shorten a specific request to just "лак". Leave query empty only for the full catalog. For a specific stock question, check_product_stock may be used directly with product_query. Do not answer current product catalog or price questions from memory when this tool is available.',
 
       inputSchema:
         z.object({
@@ -4007,10 +4015,17 @@ function renderBooking(
       );
 
   const latest =
-    data.bookings &&
-    data.bookings.length
-      ? data.bookings[0]
-      : null;
+  data.bookings &&
+  data.bookings.length
+    ? data.bookings.find(
+        function(item) {
+          return (
+            item.status ===
+            'confirmed'
+          );
+        }
+      ) || null
+    : null;
 
   if (
     !latest
