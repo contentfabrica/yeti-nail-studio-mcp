@@ -1202,8 +1202,7 @@ function createServer() {
     'get_services',
     {
       description:
-        'ALWAYS call this tool for questions about salon services, service names, categories, prices, durations, manicure, pedicure, the Полный фарш complex, or what services are offered. Use query for a specific service or category. Leave query empty for the full service list. Never answer service catalog or current price questions from memory when this tool is available.',
-
+  'ALWAYS call this tool for questions about salon services, service names, categories, prices, durations, manicure, pedicure, or what services are offered. IMPORTANT: preserve all distinguishing words from the user request. If the user asks about a specific service, pass the specific service name or phrase as query. For example, if the user says "Жена миллионера", pass query="Жена миллионера"; if the user says "Слёзы бывшего", pass query="Слёзы бывшего"; if the user says "Брутальный уход", pass query="Брутальный уход"; if the user says "Можно в сандальках", pass query="Можно в сандальках"; if the user says "Полный фарш", pass query="Полный фарш". Never shorten a specific service request to a generic category such as "маникюр", "педикюр" or "услуга". Use a generic category only when the user actually asks about the whole category. Leave query empty only for the full service list. Never answer service catalog or current price questions from memory when this tool is available.',
       inputSchema:
         z.object({
           query:
