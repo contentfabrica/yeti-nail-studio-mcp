@@ -5,20 +5,84 @@ import * as z from 'zod/v4';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
+const VERSION = '1.8.0';
+const BUSINESS_TIME_ZONE = 'Asia/Almaty';
+const UI_FLASH_MS = 15000;
+
 const services = [
-  { id: 'manicure-classic', name: 'Маникюр «Жена миллионера»', category: 'маникюр', price_kzt: 8000, duration_min: 60 },
-  { id: 'manicure-gel', name: 'Маникюр «Слёзы бывшего»', category: 'маникюр', price_kzt: 12000, duration_min: 90 },
-  { id: 'pedicure-classic', name: 'Педикюр «Брутальный уход»', category: 'педикюр', price_kzt: 10000, duration_min: 75 },
-  { id: 'pedicure-gel', name: 'Педикюр «Можно в сандальках»', category: 'педикюр', price_kzt: 14500, duration_min: 100 },
-  { id: 'nail-design', name: 'Комплекс «Полный фарш»', category: 'дизайн', price_kzt: 40000, duration_min: 30 }
+  {
+    id: 'manicure-classic',
+    name: 'Маникюр «Жена миллионера»',
+    category: 'маникюр',
+    price_kzt: 8000,
+    duration_min: 60
+  },
+  {
+    id: 'manicure-gel',
+    name: 'Маникюр «Слёзы бывшего»',
+    category: 'маникюр',
+    price_kzt: 12000,
+    duration_min: 90
+  },
+  {
+    id: 'pedicure-classic',
+    name: 'Педикюр «Брутальный уход»',
+    category: 'педикюр',
+    price_kzt: 10000,
+    duration_min: 75
+  },
+  {
+    id: 'pedicure-gel',
+    name: 'Педикюр «Можно в сандальках»',
+    category: 'педикюр',
+    price_kzt: 14500,
+    duration_min: 100
+  },
+  {
+    id: 'nail-design',
+    name: 'Комплекс «Полный фарш»',
+    category: 'дизайн',
+    price_kzt: 40000,
+    duration_min: 30
+  }
 ];
 
 const products = [
-  { id: 'lak-red-01', name: 'Лак Азатюр Блэк Свэг Даймонд', category: 'лак', price_kzt: 4500, stock: 7 },
-  { id: 'lak-red-02', name: 'Лак Моделс Голден Слэй Дэй', category: 'лак', price_kzt: 3900, stock: 3 },
-  { id: 'oil-cuticle-01', name: 'Для кутикула Шанель Ванель Камелия', category: 'уход', price_kzt: 2800, stock: 0 },
-  { id: 'cream-hand-01', name: 'Крем для рук Ла Перди На Хэнд Крэм', category: 'уход', price_kzt: 3200, stock: 11 },
-  { id: 'base-strong-01', name: 'Крем для ног Сислей Фут Донт Кэр', category: 'уход', price_kzt: 5200, stock: 5 }
+  {
+    id: 'lak-red-01',
+    name: 'Лак Азатюр Блэк Свэг Даймонд',
+    category: 'лак',
+    price_kzt: 4500,
+    stock: 7
+  },
+  {
+    id: 'lak-red-02',
+    name: 'Лак Моделс Голден Слэй Дэй',
+    category: 'лак',
+    price_kzt: 3900,
+    stock: 3
+  },
+  {
+    id: 'oil-cuticle-01',
+    name: 'Для кутикула Шанель Ванель Камелия',
+    category: 'уход',
+    price_kzt: 2800,
+    stock: 0
+  },
+  {
+    id: 'cream-hand-01',
+    name: 'Крем для рук Ла Перди На Хэнд Крэм',
+    category: 'уход',
+    price_kzt: 3200,
+    stock: 11
+  },
+  {
+    id: 'base-strong-01',
+    name: 'Крем для ног Сислей Фут Донт Кэр',
+    category: 'уход',
+    price_kzt: 5200,
+    stock: 5
+  }
 ];
 
 const SERVICE_ALIASES = {
@@ -41,22 +105,22 @@ const SERVICE_ALIASES = {
     'педикюр брутальный уход',
     'классический педикюр',
     'педикюр классический',
-    'мужской педикюр'
+    'мужской',
+    'мужской педикюр',
+    'педикюр мужской'
   ],
 
   'pedicure-gel': [
-  'можно в сандальках',
-  'педикюр можно в сандальках',
-  'можно в босоножки',
-  'педикюр можно в босоножки',
-
-  'женский',
-  'женский педикюр',
-  'педикюр женский',
-
-  'педикюр с гель лаком',
-  'гель лак педикюр'
-],
+    'можно в сандальках',
+    'педикюр можно в сандальках',
+    'можно в босоножки',
+    'педикюр можно в босоножки',
+    'женский',
+    'женский педикюр',
+    'педикюр женский',
+    'педикюр с гель лаком',
+    'гель лак педикюр'
+  ],
 
   'nail-design': [
     'полный фарш',
@@ -76,6 +140,10 @@ const PRODUCT_ALIASES = {
     'черный',
     'черный лак',
     'черный лак для ногтей',
+
+    'блэк',
+    'блэк даймонд',
+
     'black',
     'black polish',
 
@@ -89,11 +157,15 @@ const PRODUCT_ALIASES = {
     'голд раш',
     'голден слэй дэй',
 
+    'желтый',
+    'желтый лак',
+    'желтый лак для ногтей',
+
     'золотой',
     'золотой лак',
     'золотой лак для ногтей',
-    'желтый',
-    'желтый лак',
+
+    'голд',
     'gold',
     'golden',
     'gold polish',
@@ -107,29 +179,46 @@ const PRODUCT_ALIASES = {
     'шанель',
     'шанель камелия',
     'шанель ванель камелия',
+
     'chanel',
     'chanel l huile camelia',
     'l huile camelia',
+
     'масло для кутикулы',
-    'средство для кутикулы'
+    'средство для кутикулы',
+    'кутикула',
+    'кутикулы'
   ],
 
   'cream-hand-01': [
     'ла прери',
     'ла перди',
+
     'la prairie',
     'la prairie cellular hand cream',
+
     'крем для рук',
+    'для рук',
+    'руки',
+    'рук',
+
     'hand cream'
   ],
 
   'base-strong-01': [
     'сислей',
     'сислей фут',
+
     'sisley',
     'sisley paris restructuring care for feet',
+
     'крем для ног',
-    'foot care'
+    'для ног',
+    'ноги',
+    'ног',
+
+    'foot care',
+    'foot cream'
   ]
 };
 
@@ -143,25 +232,31 @@ const defaultSlots = [
 
 const bookings = [];
 
-const BUSINESS_TIME_ZONE =
-  'Asia/Almaty';
-
 const uiState = {
   event_seq: 0,
   last_action: 'idle',
   last_action_at: null,
+
   focus: null,
+
   selected_date: null,
   selected_service_id: null,
   selected_time: null,
+
   touched_booking_id: null,
+
   product_ids: [],
-  service_ids: []
+  service_ids: [],
+
+  last_query: null,
+  last_match_ids: []
 };
 
 const uiEvents = [];
 
-function textResult(obj) {
+function textResult(
+  obj
+) {
   return {
     content: [
       {
@@ -173,11 +268,15 @@ function textResult(obj) {
         )
       }
     ],
-    structuredContent: obj
+
+    structuredContent:
+      obj
   };
 }
 
-function errorResult(message) {
+function errorResult(
+  message
+) {
   return {
     content: [
       {
@@ -185,18 +284,592 @@ function errorResult(message) {
         text: message
       }
     ],
-    isError: true
+
+    isError:
+      true
   };
 }
 
-function normalize(value = '') {
-  return String(value ?? '')
+function normalize(
+  value = ''
+) {
+  return String(
+    value ??
+    ''
+  )
     .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/[-–—]/g, ' ')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(
+      /ё/g,
+      'е'
+    )
+    .replace(
+      /[-–—]/g,
+      ' '
+    )
+    .replace(
+      /[«»"'`]/g,
+      ' '
+    )
+    .replace(
+      /[^\p{L}\p{N}]+/gu,
+      ' '
+    )
     .trim()
-    .replace(/\s+/g, ' ');
+    .replace(
+      /\s+/g,
+      ' '
+    );
+}
+
+const QUERY_STOP_WORDS =
+  new Set([
+    'а',
+    'и',
+    'или',
+    'ну',
+    'тогда',
+    'пожалуйста',
+    'сейчас',
+
+    'какие',
+    'какой',
+    'какая',
+    'какое',
+
+    'что',
+    'есть',
+    'ли',
+    'у',
+    'вас',
+    'мне',
+    'меня',
+
+    'до',
+    'не',
+
+    'покажи',
+    'показать',
+    'подскажи',
+    'расскажи',
+
+    'сколько',
+    'стоит',
+    'цена',
+    'цены',
+
+    'по',
+    'на',
+    'в',
+    'из',
+    'для',
+
+    'все',
+    'весь',
+    'вся',
+
+    'услуги',
+    'услуга',
+
+    'товары',
+    'товар',
+    'продукты',
+    'продукт',
+
+    'каталог',
+    'ассортимент',
+
+    'доступно',
+    'доступны',
+    'имеются',
+
+    'наличие',
+    'наличии',
+
+    'остаток',
+    'остатки',
+    'осталось',
+
+    'штук',
+    'шт',
+
+    'дешевле',
+    'дороже',
+
+    'дешевый',
+    'дешевая',
+    'дешевое',
+    'дешевые',
+
+    'недорогой',
+    'недорогая',
+    'недорогие',
+
+    'дорогой',
+    'дорогая',
+    'дорогое',
+    'дорогие',
+
+    'самый',
+    'самая',
+    'самое',
+
+    'вариант',
+    'варианты',
+
+    'можно',
+    'купить',
+
+    'хочу',
+
+    'запиши',
+    'записать',
+    'запись',
+
+    'сделать',
+    'приду',
+    'приеду',
+
+    'такой',
+    'такая',
+    'такое',
+
+    'этот',
+    'эта',
+    'это',
+    'эти',
+
+    'же',
+    'еще',
+    'ещё',
+    'вообще',
+    'тоже'
+  ]);
+
+function canonicalToken(
+  token
+) {
+  const t =
+    normalize(
+      token
+    );
+
+  if (
+    !t
+  ) {
+    return '';
+  }
+
+  if (
+    /^черн/.test(t)
+  ) {
+    return 'черный';
+  }
+
+  if (
+    /^желт/.test(t)
+  ) {
+    return 'желтый';
+  }
+
+  if (
+    /^золот/.test(t)
+  ) {
+    return 'золотой';
+  }
+
+  if (
+    /^мужск/.test(t)
+  ) {
+    return 'мужской';
+  }
+
+  if (
+    /^женск/.test(t)
+  ) {
+    return 'женский';
+  }
+
+  if (
+    /^маникюр/.test(t)
+  ) {
+    return 'маникюр';
+  }
+
+  if (
+    /^педикюр/.test(t)
+  ) {
+    return 'педикюр';
+  }
+
+  if (
+    /^крем/.test(t)
+  ) {
+    return 'крем';
+  }
+
+  if (
+    /^лак/.test(t)
+  ) {
+    return 'лак';
+  }
+
+  if (
+    /^рук/.test(t)
+  ) {
+    return 'руки';
+  }
+
+  if (
+    /^ногт/.test(t)
+  ) {
+    return 'ногти';
+  }
+
+  if (
+    /^ног/.test(t)
+  ) {
+    return 'ноги';
+  }
+
+  if (
+    /^лиц/.test(t)
+  ) {
+    return 'лицо';
+  }
+
+  if (
+    /^кутикул/.test(t)
+  ) {
+    return 'кутикула';
+  }
+
+  return t;
+}
+
+function canonicalTokens(
+  value,
+  removeStops = false
+) {
+  return normalize(
+    value
+  )
+    .split(
+      /\s+/
+    )
+    .filter(
+      Boolean
+    )
+    .filter(
+      token =>
+        !removeStops ||
+        !QUERY_STOP_WORDS.has(
+          token
+        )
+    )
+    .map(
+      canonicalToken
+    )
+    .filter(
+      Boolean
+    );
+}
+
+function meaningfulQueryTerms(
+  value
+) {
+  return [
+    ...new Set(
+      canonicalTokens(
+        value,
+        true
+      )
+    )
+  ];
+}
+
+function searchTokenSet(
+  value
+) {
+  return new Set(
+    canonicalTokens(
+      value,
+      false
+    )
+  );
+}
+
+function isGenericServiceQuery(
+  value
+) {
+  return [
+    '',
+    'все',
+    'услуги',
+    'все услуги',
+    'прайс',
+    'прайс лист',
+    'каталог',
+    'ассортимент'
+  ].includes(
+    normalize(
+      value
+    )
+  );
+}
+
+function isGenericProductQuery(
+  value
+) {
+  return [
+    '',
+    'все',
+    'товары',
+    'все товары',
+    'продукты',
+    'все продукты',
+    'каталог',
+    'ассортимент'
+  ].includes(
+    normalize(
+      value
+    )
+  );
+}
+
+function serviceSearchText(
+  service
+) {
+  return normalize(
+    [
+      service.name,
+      service.category,
+
+      ...(
+        SERVICE_ALIASES[
+          service.id
+        ] ||
+        []
+      )
+    ].join(
+      ' '
+    )
+  );
+}
+
+function productSearchText(
+  product
+) {
+  return normalize(
+    [
+      product.name,
+      product.category,
+
+      ...(
+        PRODUCT_ALIASES[
+          product.id
+        ] ||
+        []
+      )
+    ].join(
+      ' '
+    )
+  );
+}
+
+function serviceAliasMatches(
+  service,
+  q
+) {
+  return (
+    SERVICE_ALIASES[
+      service.id
+    ] ||
+    []
+  ).some(
+    alias =>
+      normalize(
+        alias
+      ) === q
+  );
+}
+
+function productAliasMatches(
+  product,
+  q
+) {
+  return (
+    PRODUCT_ALIASES[
+      product.id
+    ] ||
+    []
+  ).some(
+    alias =>
+      normalize(
+        alias
+      ) === q
+  );
+}
+
+function matchesAllTerms(
+  searchText,
+  terms
+) {
+  if (
+    !terms.length
+  ) {
+    return false;
+  }
+
+  const hay =
+    searchTokenSet(
+      searchText
+    );
+
+  return terms.every(
+    term =>
+      hay.has(
+        term
+      )
+  );
+}
+
+function findServices(
+  rawQuery
+) {
+  const raw =
+    String(
+      rawQuery ??
+      ''
+    );
+
+  const q =
+    normalize(
+      raw
+    );
+
+  const terms =
+    meaningfulQueryTerms(
+      raw
+    );
+
+  if (
+    isGenericServiceQuery(
+      raw
+    ) ||
+    terms.length ===
+      0
+  ) {
+    return services;
+  }
+
+  const exact =
+    services.filter(
+      service =>
+        normalize(
+          service.id
+        ) === q ||
+
+        normalize(
+          service.name
+        ) === q ||
+
+        serviceAliasMatches(
+          service,
+          q
+        )
+    );
+
+  if (
+    exact.length
+  ) {
+    return exact;
+  }
+
+  return services.filter(
+    service =>
+      matchesAllTerms(
+        serviceSearchText(
+          service
+        ),
+        terms
+      )
+  );
+}
+
+function findProducts(
+  rawQuery,
+  options = {}
+) {
+  const raw =
+    String(
+      rawQuery ??
+      ''
+    );
+
+  const q =
+    normalize(
+      raw
+    );
+
+  let terms =
+    meaningfulQueryTerms(
+      raw
+    );
+
+  if (
+    options.ignoreNumbers
+  ) {
+    terms =
+      terms.filter(
+        term =>
+          !/^\d+$/.test(
+            term
+          )
+      );
+  }
+
+  if (
+    isGenericProductQuery(
+      raw
+    ) ||
+    terms.length ===
+      0
+  ) {
+    return products;
+  }
+
+  const exact =
+    products.filter(
+      product =>
+        normalize(
+          product.id
+        ) === q ||
+
+        normalize(
+          product.name
+        ) === q ||
+
+        productAliasMatches(
+          product,
+          q
+        )
+    );
+
+  if (
+    exact.length
+  ) {
+    return exact;
+  }
+
+  return products.filter(
+    product =>
+      matchesAllTerms(
+        productSearchText(
+          product
+        ),
+        terms
+      )
+  );
 }
 
 function markUi(
@@ -204,25 +877,34 @@ function markUi(
   focus,
   payload = {}
 ) {
-  uiState.event_seq += 1;
-  uiState.last_action = action;
+  uiState.event_seq +=
+    1;
+
+  uiState.last_action =
+    action;
+
   uiState.last_action_at =
-    new Date().toISOString();
+    new Date()
+      .toISOString();
+
   uiState.focus =
-    focus ?? null;
+    focus ??
+    null;
 
   if (
     focus !==
     'products'
   ) {
-    uiState.product_ids = [];
+    uiState.product_ids =
+      [];
   }
 
   if (
     focus !==
     'services'
   ) {
-    uiState.service_ids = [];
+    uiState.service_ids =
+      [];
   }
 
   if (
@@ -273,206 +955,46 @@ function markUi(
       payload.service_ids;
   }
 
+  if (
+    payload.query !==
+    undefined
+  ) {
+    uiState.last_query =
+      payload.query;
+  }
+
+  if (
+    payload.match_ids !==
+    undefined
+  ) {
+    uiState.last_match_ids =
+      payload.match_ids;
+  }
+
   uiEvents.push({
-    seq: uiState.event_seq,
+    seq:
+      uiState.event_seq,
+
     action,
-    focus: uiState.focus,
-    at: uiState.last_action_at,
-    payload: { ...payload }
+
+    focus:
+      uiState.focus,
+
+    at:
+      uiState.last_action_at,
+
+    payload:
+      {
+        ...payload
+      }
   });
 
   if (
     uiEvents.length >
-    25
+    40
   ) {
     uiEvents.shift();
   }
-}
-
-const QUERY_STOP_WORDS =
-  new Set([
-    'а',
-    'и',
-    'или',
-    'ну',
-    'тогда',
-    'пожалуйста',
-    'сейчас',
-    'какие',
-    'какой',
-    'какая',
-    'какое',
-    'что',
-    'есть',
-    'ли',
-    'у',
-    'вас',
-    'мне',
-    'меня',
-    'покажи',
-    'показать',
-    'подскажи',
-    'расскажи',
-    'сколько',
-    'стоит',
-    'цена',
-    'цены',
-    'по',
-    'на',
-    'в',
-    'из',
-    'для',
-    'все',
-    'весь',
-    'вся',
-    'услуги',
-    'услуга',
-    'товары',
-    'товар',
-    'продукты',
-    'продукт',
-    'каталог',
-    'ассортимент',
-    'доступно',
-    'доступны',
-    'имеются',
-    'наличие',
-    'наличии',
-    'остаток',
-    'остатки',
-    'осталось',
-    'штук',
-    'шт',
-    'дешевле',
-    'дороже',
-    'самый',
-    'самая',
-    'самое',
-    'вариант',
-    'варианты',
-    'можно',
-    'купить',
-    'хочу',
-    'запиши',
-    'записать',
-    'запись',
-    'сделать',
-    'приду',
-    'приеду'
-  ]);
-
-function meaningfulQueryTerms(
-  value
-) {
-  return normalize(value)
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter(
-      term =>
-        !QUERY_STOP_WORDS.has(
-          term
-        )
-    );
-}
-
-function isGenericServiceQuery(
-  value
-) {
-  return [
-    '',
-    'все',
-    'услуги',
-    'все услуги',
-    'прайс',
-    'прайс лист',
-    'каталог',
-    'ассортимент'
-  ].includes(
-    normalize(value)
-  );
-}
-
-function isGenericProductQuery(
-  value
-) {
-  return [
-    '',
-    'все',
-    'товары',
-    'все товары',
-    'продукты',
-    'все продукты',
-    'каталог',
-    'ассортимент'
-  ].includes(
-    normalize(value)
-  );
-}
-
-function serviceSearchText(
-  service
-) {
-  return normalize(
-    [
-      service.name,
-      service.category,
-      ...(
-        SERVICE_ALIASES[
-          service.id
-        ] ||
-        []
-      )
-    ].join(' ')
-  );
-}
-
-function productSearchText(
-  product
-) {
-  return normalize(
-    [
-      product.name,
-      product.category,
-      ...(
-        PRODUCT_ALIASES[
-          product.id
-        ] ||
-        []
-      )
-    ].join(' ')
-  );
-}
-
-function serviceAliasMatches(
-  service,
-  q
-) {
-  return (
-    SERVICE_ALIASES[
-      service.id
-    ] ||
-    []
-  ).some(
-    alias =>
-      normalize(alias) ===
-      q
-  );
-}
-
-function productAliasMatches(
-  product,
-  q
-) {
-  return (
-    PRODUCT_ALIASES[
-      product.id
-    ] ||
-    []
-  ).some(
-    alias =>
-      normalize(alias) ===
-      q
-  );
 }
 
 function resolveServiceReference(
@@ -501,13 +1023,14 @@ function resolveServiceReference(
         };
   }
 
-  const q =
-    normalize(
-      service_query
-    );
+  const raw =
+    service_query ||
+    '';
 
   if (
-    !q &&
+    !normalize(
+      raw
+    ) &&
     fallbackId
   ) {
     const fallback =
@@ -528,7 +1051,9 @@ function resolveServiceReference(
   }
 
   if (
-    !q
+    !normalize(
+      raw
+    )
   ) {
     return {
       error:
@@ -536,69 +1061,9 @@ function resolveServiceReference(
     };
   }
 
-  let matches =
-    services.filter(
-      s =>
-        normalize(
-          s.name
-        ) === q ||
-        normalize(
-          s.id
-        ) === q ||
-        serviceAliasMatches(
-          s,
-          q
-        )
-    );
-
-  if (
-    matches.length ===
-    1
-  ) {
-    return {
-      service:
-        matches[0]
-    };
-  }
-
-  matches =
-    services.filter(
-      s =>
-        serviceSearchText(
-          s
-        ).includes(q)
-    );
-
-  if (
-    matches.length ===
-    1
-  ) {
-    return {
-      service:
-        matches[0]
-    };
-  }
-
-  const terms =
-    meaningfulQueryTerms(
-      service_query
-    );
-
-  matches =
-    services.filter(
-      s => {
-        const hay =
-          serviceSearchText(
-            s
-          );
-
-        return terms.every(
-          term =>
-            hay.includes(
-              term
-            )
-        );
-      }
+  const matches =
+    findServices(
+      raw
     );
 
   if (
@@ -626,14 +1091,16 @@ function resolveServiceReference(
               s.id +
               ')'
           )
-          .join(', ')
+          .join(
+            ', '
+          )
     };
   }
 
   return {
     error:
       'No service matched "' +
-      service_query +
+      raw +
       '".'
   };
 }
@@ -663,13 +1130,14 @@ function resolveProductReference(
         };
   }
 
-  const q =
-    normalize(
-      product_query
-    );
+  const raw =
+    product_query ||
+    '';
 
   if (
-    !q
+    !normalize(
+      raw
+    )
   ) {
     return {
       error:
@@ -677,69 +1145,9 @@ function resolveProductReference(
     };
   }
 
-  let matches =
-    products.filter(
-      p =>
-        normalize(
-          p.name
-        ) === q ||
-        normalize(
-          p.id
-        ) === q ||
-        productAliasMatches(
-          p,
-          q
-        )
-    );
-
-  if (
-    matches.length ===
-    1
-  ) {
-    return {
-      product:
-        matches[0]
-    };
-  }
-
-  matches =
-    products.filter(
-      p =>
-        productSearchText(
-          p
-        ).includes(q)
-    );
-
-  if (
-    matches.length ===
-    1
-  ) {
-    return {
-      product:
-        matches[0]
-    };
-  }
-
-  const terms =
-    meaningfulQueryTerms(
-      product_query
-    );
-
-  matches =
-    products.filter(
-      p => {
-        const hay =
-          productSearchText(
-            p
-          );
-
-        return terms.every(
-          term =>
-            hay.includes(
-              term
-            )
-        );
-      }
+  const matches =
+    findProducts(
+      raw
     );
 
   if (
@@ -767,14 +1175,16 @@ function resolveProductReference(
               p.id +
               ')'
           )
-          .join(', ')
+          .join(
+            ', '
+          )
     };
   }
 
   return {
     error:
       'No product matched "' +
-      product_query +
+      raw +
       '".'
   };
 }
@@ -783,23 +1193,22 @@ function getBusinessDate(
   offsetDays = 0
 ) {
   const parts =
-    new Intl
-      .DateTimeFormat(
-        'en-CA',
-        {
-          timeZone:
-            BUSINESS_TIME_ZONE,
+    new Intl.DateTimeFormat(
+      'en-CA',
+      {
+        timeZone:
+          BUSINESS_TIME_ZONE,
 
-          year:
-            'numeric',
+        year:
+          'numeric',
 
-          month:
-            '2-digit',
+        month:
+          '2-digit',
 
-          day:
-            '2-digit'
-        }
-      )
+        day:
+          '2-digit'
+      }
+    )
       .formatToParts(
         new Date()
       );
@@ -875,7 +1284,9 @@ function isValidIsoDate(
     );
 
   const date =
-    new Date(0);
+    new Date(
+      0
+    );
 
   date.setUTCFullYear(
     year,
@@ -893,8 +1304,10 @@ function isValidIsoDate(
   return (
     date.getUTCFullYear() ===
       year &&
+
     date.getUTCMonth() ===
       month - 1 &&
+
     date.getUTCDate() ===
       day
   );
@@ -960,22 +1373,6 @@ function resolveBookingDateWithFallback(
   return null;
 }
 
-function getRescheduleFallbackDate(
-  booking
-) {
-  if (
-    uiState.last_action ===
-      'slots_checked' &&
-    isValidIsoDate(
-      uiState.selected_date
-    )
-  ) {
-    return uiState.selected_date;
-  }
-
-  return booking.date;
-}
-
 function findBookingById(
   booking_id
 ) {
@@ -995,10 +1392,13 @@ function isSlotOccupied(
     b =>
       b.booking_id !==
         excludeBookingId &&
+
       b.date ===
         date &&
+
       b.time ===
         time &&
+
       b.status ===
         'confirmed'
   );
@@ -1017,6 +1417,7 @@ function findConfirmedBookingsByCustomer(
       normalize(
         b.customer_name
       ) === q &&
+
       b.status ===
         'confirmed'
   );
@@ -1104,7 +1505,8 @@ function latestBookingFirst(
           a.cancelled_at ||
           a.created_at ||
           0
-        ).getTime();
+        )
+          .getTime();
 
       const tb =
         new Date(
@@ -1112,11 +1514,30 @@ function latestBookingFirst(
           b.cancelled_at ||
           b.created_at ||
           0
-        ).getTime();
+        )
+          .getTime();
 
-      return tb - ta;
+      return tb -
+        ta;
     }
   );
+}
+
+function getRescheduleFallbackDate(
+  booking
+) {
+  if (
+    uiState.last_action ===
+      'slots_checked' &&
+
+    isValidIsoDate(
+      uiState.selected_date
+    )
+  ) {
+    return uiState.selected_date;
+  }
+
+  return booking.date;
 }
 
 function buildDemoData() {
@@ -1134,8 +1555,10 @@ function buildDemoData() {
             b =>
               b.date ===
                 displayDate &&
+
               b.time ===
                 time &&
+
               b.status ===
                 'confirmed'
           );
@@ -1164,6 +1587,9 @@ function buildDemoData() {
   return {
     service:
       'Yeti Nail Studio',
+
+    version:
+      VERSION,
 
     timezone:
       BUSINESS_TIME_ZONE,
@@ -1200,22 +1626,33 @@ function createServer() {
         'yeti-nail-studio-demo',
 
       version:
-        '1.7.0'
+        VERSION
     });
 
   server.registerTool(
     'get_services',
     {
       description:
-  'ALWAYS call this tool for questions about salon services, service names, categories, prices, durations, manicure, pedicure, or what services are offered. IMPORTANT: preserve all distinguishing words from the user request. If the user asks about a specific service, pass the specific service name or phrase as query. For example, if the user says "Жена миллионера", pass query="Жена миллионера"; if the user says "Слёзы бывшего", pass query="Слёзы бывшего"; if the user says "Брутальный уход", pass query="Брутальный уход"; if the user says "Можно в сандальках", pass query="Можно в сандальках"; if the user says "Полный фарш", pass query="Полный фарш". If the user says "мужской педикюр", pass query="мужской педикюр". If the user says "женский педикюр", pass query="женский педикюр". Never reduce a specific service request to a generic category such as "маникюр", "педикюр", "дизайн", or "услуга". In particular, never reduce "мужской педикюр" or "женский педикюр" to just "педикюр". Use a generic category only when the user actually asks about the whole category. Leave query empty only for the full service list. Never answer service catalog or current price questions from memory when this tool is available.',
+        'ALWAYS call this tool for every current salon-service question, including service names, categories, prices, durations, manicure, pedicure, and repeated questions. IMPORTANT: copy the user current request as faithfully as possible into user_request, preserving all distinguishing words. Never reduce a specific request to a generic category. Examples: "Жена миллионера" must stay specific; "Слёзы бывшего" must stay specific; "мужской педикюр" must stay "мужской педикюр"; "женский педикюр" must stay "женский педикюр". Only a genuinely generic request such as "какие маникюры есть?" should match the whole manicure category. Always make a fresh tool call even if the same information was asked earlier.',
+
       inputSchema:
         z.object({
+          user_request:
+            z
+              .string()
+              .min(
+                1
+              )
+              .describe(
+                'Copy the user CURRENT service request as literally as possible, including words such as мужской, женский, маникюр, педикюр, and the exact service nickname. Do not shorten or generalize it.'
+              ),
+
           query:
             z
               .string()
               .optional()
               .describe(
-                'Optional service name or category, for example Жена миллионера, Слёзы бывшего, Брутальный уход, Можно в сандальках, Полный фарш, маникюр or педикюр. Leave empty for all services.'
+                'Optional lookup phrase. If supplied, preserve all distinguishing words. user_request is the authoritative input.'
               ),
 
           category:
@@ -1223,83 +1660,45 @@ function createServer() {
               .string()
               .optional()
               .describe(
-                'Legacy optional category. Prefer query. Kept for compatibility.'
+                'Legacy compatibility only.'
               )
         })
     },
 
     async ({
+      user_request,
       query,
       category
     }) => {
       const raw =
-        query ??
-        category ??
+        user_request ||
+        query ||
+        category ||
         '';
 
-      const q =
-        normalize(
+      const list =
+        findServices(
           raw
         );
 
-      const terms =
-        meaningfulQueryTerms(
-          raw
+      const ids =
+        list.map(
+          s =>
+            s.id
         );
-
-      let list;
-
-      if (
-        isGenericServiceQuery(
-          raw
-        ) ||
-        terms.length ===
-          0
-      ) {
-        list =
-          services;
-      } else {
-        list =
-          services.filter(
-            s =>
-              serviceSearchText(
-                s
-              ).includes(
-                q
-              )
-          );
-
-        if (
-          list.length ===
-          0
-        ) {
-          list =
-            services.filter(
-              s => {
-                const hay =
-                  serviceSearchText(
-                    s
-                  );
-
-                return terms.every(
-                  term =>
-                    hay.includes(
-                      term
-                    )
-                );
-              }
-            );
-        }
-      }
 
       markUi(
         'services_loaded',
         'services',
         {
+          query:
+            raw,
+
+          match_ids:
+            ids,
+
           service_ids:
-            list.map(
-              s => s.id
-            ),
+            ids,
 
           selected_service_id:
             list.length ===
@@ -1310,8 +1709,14 @@ function createServer() {
       );
 
       return textResult({
+        query_received:
+          raw,
+
         currency:
           'KZT',
+
+        count:
+          list.length,
 
         services:
           list
@@ -1323,44 +1728,31 @@ function createServer() {
     'check_available_slots',
     {
       description:
-        'Use this tool when the user asks which appointment times are free, available, or asks you to suggest a time. Do NOT call it again just before create_booking when the user has already selected an exact slot; create_booking performs its own final availability check. Relative dates should use today or tomorrow. The tool can also remember the selected service and date for the next booking turn.',
+        'Use this tool when the user asks which appointment times are free or asks you to suggest a time. Do NOT call it again immediately before create_booking when an exact slot is already selected; create_booking performs its own final availability check.',
 
       inputSchema:
         z.object({
           date_type:
-            z
-              .enum([
-                'today',
-                'tomorrow',
-                'exact'
-              ])
-              .describe(
-                'Use today for сегодня, tomorrow for завтра, and exact only when the user explicitly gives a calendar date.'
-              ),
+            z.enum([
+              'today',
+              'tomorrow',
+              'exact'
+            ]),
 
           exact_date:
             z
               .string()
-              .optional()
-              .describe(
-                'YYYY-MM-DD only when date_type is exact. Leave empty for today or tomorrow.'
-              ),
+              .optional(),
 
           service_id:
             z
               .string()
-              .optional()
-              .describe(
-                'Optional service id from get_services.'
-              ),
+              .optional(),
 
           service_query:
             z
               .string()
-              .optional()
-              .describe(
-                'Optional natural service name such as Жена миллионера, Брутальный уход, Можно в сандальках or Полный фарш when service_id is not known.'
-              ),
+              .optional(),
 
           time_of_day:
             z
@@ -1370,9 +1762,6 @@ function createServer() {
                 'evening'
               ])
               .optional()
-              .describe(
-                'Optional preferred part of day.'
-              )
         })
     },
 
@@ -1404,22 +1793,22 @@ function createServer() {
         service_id ||
         service_query
       ) {
-        const resolvedService =
+        const resolved =
           resolveServiceReference(
             service_id,
             service_query
           );
 
         if (
-          resolvedService.error
+          resolved.error
         ) {
           return errorResult(
-            resolvedService.error
+            resolved.error
           );
         }
 
         selectedService =
-          resolvedService.service;
+          resolved.service;
       }
 
       let slots =
@@ -1485,8 +1874,14 @@ function createServer() {
           service_ids:
             selectedService
               ? [
-                  selectedService
-                    .id
+                  selectedService.id
+                ]
+              : [],
+
+          match_ids:
+            selectedService
+              ? [
+                  selectedService.id
                 ]
               : []
         }
@@ -1499,12 +1894,10 @@ function createServer() {
           selectedService
             ? {
                 id:
-                  selectedService
-                    .id,
+                  selectedService.id,
 
                 name:
-                  selectedService
-                    .name
+                  selectedService.name
               }
             : null,
 
@@ -1518,33 +1911,26 @@ function createServer() {
     'create_booking',
     {
       description:
-        'ALWAYS call this tool when the user clearly asks to book or make a NEW appointment and customer name, service, date, and time are known either from the current message or from the immediately preceding booking conversation. Reuse the date/service just selected in the previous availability turn instead of forcing the user to repeat them. Do NOT call check_available_slots again when an exact slot was already chosen; this tool performs its own final slot validation. Do not use for moving or cancelling an existing booking.',
+        'ALWAYS use this tool for a NEW appointment when customer name, service, date, and time are known. Reuse the selected service/date from the immediately preceding booking turn when appropriate. Never use this tool to modify an existing booking.',
 
       inputSchema:
         z.object({
           customer_name:
             z
               .string()
-              .min(1)
-              .describe(
-                'Customer name exactly as the user provided it or as already known in the current conversation.'
+              .min(
+                1
               ),
 
           service_id:
             z
               .string()
-              .optional()
-              .describe(
-                'Optional service id from get_services. If omitted, use service_query or the service selected in the immediately preceding turn.'
-              ),
+              .optional(),
 
           service_query:
             z
               .string()
-              .optional()
-              .describe(
-                'Optional natural service name such as Жена миллионера, Слёзы бывшего, Брутальный уход, Можно в сандальках or Полный фарш when service_id is not known.'
-              ),
+              .optional(),
 
           date_type:
             z
@@ -1553,27 +1939,18 @@ function createServer() {
                 'tomorrow',
                 'exact'
               ])
-              .optional()
-              .describe(
-                'Use today for сегодня, tomorrow for завтра, exact for an explicit date. May be omitted only when continuing immediately from a check_available_slots result; the server will reuse that selected date.'
-              ),
+              .optional(),
 
           exact_date:
             z
               .string()
-              .optional()
-              .describe(
-                'YYYY-MM-DD only when date_type is exact.'
-              ),
+              .optional(),
 
           time:
             z
               .string()
               .regex(
                 /^([01]\d|2[0-3]):[0-5]\d$/
-              )
-              .describe(
-                'Appointment time in HH:MM format.'
               )
         })
     },
@@ -1601,7 +1978,7 @@ function createServer() {
         );
       }
 
-      const resolvedService =
+      const resolved =
         resolveServiceReference(
           service_id,
           service_query,
@@ -1609,15 +1986,15 @@ function createServer() {
         );
 
       if (
-        resolvedService.error
+        resolved.error
       ) {
         return errorResult(
-          resolvedService.error
+          resolved.error
         );
       }
 
       const service =
-        resolvedService.service;
+        resolved.service;
 
       if (
         !defaultSlots.includes(
@@ -1707,6 +2084,11 @@ function createServer() {
               service.id
             ],
 
+          match_ids:
+            [
+              service.id
+            ],
+
           touched_booking_id:
             booking.booking_id
         }
@@ -1722,16 +2104,15 @@ function createServer() {
     'get_customer_bookings',
     {
       description:
-        'Find existing salon bookings for a customer. Use this BEFORE rescheduling or cancelling when the user refers to my booking, my appointment, move my appointment, change the time, or cancel my appointment. Use the returned booking_id with reschedule_booking or cancel_booking.',
+        'Find existing bookings for a customer. Use this before rescheduling or cancelling when the correct booking_id is not already known.',
 
       inputSchema:
         z.object({
           customer_name:
             z
               .string()
-              .min(1)
-              .describe(
-                'Customer name exactly as known from the conversation'
+              .min(
+                1
               ),
 
           status:
@@ -1742,9 +2123,6 @@ function createServer() {
                 'all'
               ])
               .optional()
-              .describe(
-                'Default confirmed. Use all only when history is needed.'
-              )
         })
     },
 
@@ -1816,6 +2194,14 @@ function createServer() {
                 ]
               : [],
 
+          match_ids:
+            first
+              ?.service_id
+              ? [
+                  first.service_id
+                ]
+              : [],
+
           touched_booking_id:
             first
               ?.booking_id ??
@@ -1825,7 +2211,6 @@ function createServer() {
 
       return textResult({
         customer_name,
-
         bookings:
           list
       });
@@ -1836,16 +2221,15 @@ function createServer() {
     'reschedule_booking',
     {
       description:
-        'Move an EXISTING confirmed booking to a new date and/or time while keeping the same booking_id. ALWAYS use this when the user says move, change, reschedule, switch the time/date, or changed their mind about an existing appointment. If only the date changes, omit new_time and the current time is preserved. If only the time changes, omit new_date_type and the current booking date is preserved. If check_available_slots was called immediately before this tool, its selected date may be reused. Do not create a second booking. If the user asks for TWO OR MORE dependent booking changes in the same message, use process_booking_changes instead.',
+        'Move an EXISTING confirmed booking while keeping the same booking_id. If only time changes, preserve the current date. If only date changes, preserve the current time. Do not create a second booking.',
 
       inputSchema:
         z.object({
           booking_id:
             z
               .string()
-              .min(1)
-              .describe(
-                'Existing booking id returned by get_customer_bookings.'
+              .min(
+                1
               ),
 
           new_date_type:
@@ -1855,18 +2239,12 @@ function createServer() {
                 'tomorrow',
                 'exact'
               ])
-              .optional()
-              .describe(
-                'Optional new date. Use today for сегодня, tomorrow for завтра, exact for an explicit date. If omitted, keep the current booking date unless immediately reusing a date from check_available_slots.'
-              ),
+              .optional(),
 
           new_exact_date:
             z
               .string()
-              .optional()
-              .describe(
-                'YYYY-MM-DD only when new_date_type is exact.'
-              ),
+              .optional(),
 
           new_time:
             z
@@ -1875,9 +2253,6 @@ function createServer() {
                 /^([01]\d|2[0-3]):[0-5]\d$/
               )
               .optional()
-              .describe(
-                'Optional new appointment time in HH:MM format. If omitted, keep the current booking time.'
-              )
         })
     },
 
@@ -1924,7 +2299,7 @@ function createServer() {
         !newDate
       ) {
         return errorResult(
-          'New appointment date is invalid. Provide today, tomorrow, a real exact date, or check available slots first.'
+          'New appointment date is invalid.'
         );
       }
 
@@ -1967,7 +2342,7 @@ function createServer() {
           newDate +
           ' ' +
           targetTime +
-          ' is already occupied. Choose another available slot.'
+          ' is already occupied.'
         );
       }
 
@@ -2007,6 +2382,11 @@ function createServer() {
               booking.service_id
             ],
 
+          match_ids:
+            [
+              booking.service_id
+            ],
+
           touched_booking_id:
             booking.booking_id
         }
@@ -2027,16 +2407,15 @@ function createServer() {
     'cancel_booking',
     {
       description:
-        'Cancel an EXISTING confirmed salon booking. ALWAYS use this when the user clearly asks to cancel or remove an existing appointment. Use get_customer_bookings first only when the correct booking_id is not already known. If the user asks for TWO OR MORE dependent booking changes in the same message, use process_booking_changes instead.',
+        'Cancel an EXISTING confirmed booking. Use get_customer_bookings first only when booking_id is not already known.',
 
       inputSchema:
         z.object({
           booking_id:
             z
               .string()
-              .min(1)
-              .describe(
-                'Existing booking id returned by get_customer_bookings.'
+              .min(
+                1
               )
         })
     },
@@ -2096,6 +2475,11 @@ function createServer() {
               booking.service_id
             ],
 
+          match_ids:
+            [
+              booking.service_id
+            ],
+
           touched_booking_id:
             booking.booking_id
         }
@@ -2114,25 +2498,19 @@ function createServer() {
     'process_booking_changes',
     {
       description:
-        'Execute TWO OR MORE dependent changes to the SAME existing booking in the exact order requested by the user, inside one server-side workflow. Example: reschedule to 15:00 and then cancel. Use this instead of separate reschedule_booking/cancel_booking calls when multiple dependent changes are requested in ONE user message. The server executes actions sequentially and stops if a step fails.',
+        'Execute TWO OR MORE dependent changes to the SAME existing booking in the exact order requested by the user. Use this instead of separate calls when multiple dependent booking changes are requested in one message.',
 
       inputSchema:
         z.object({
           booking_id:
             z
               .string()
-              .optional()
-              .describe(
-                'Existing booking id if known. Prefer this when available.'
-              ),
+              .optional(),
 
           customer_name:
             z
               .string()
-              .optional()
-              .describe(
-                'Customer name. Used to locate the booking when booking_id is not known. This works automatically only when the customer has exactly one confirmed booking.'
-              ),
+              .optional(),
 
           actions:
             z
@@ -2142,10 +2520,11 @@ function createServer() {
                   'cancel'
                 ])
               )
-              .min(2)
-              .max(4)
-              .describe(
-                'Ordered list of actions exactly as requested by the user. Example: ["reschedule", "cancel"].'
+              .min(
+                2
+              )
+              .max(
+                4
               ),
 
           new_date_type:
@@ -2155,18 +2534,12 @@ function createServer() {
                 'tomorrow',
                 'exact'
               ])
-              .optional()
-              .describe(
-                'Used when actions contains reschedule. May be omitted when keeping the current booking date or immediately reusing a date from check_available_slots.'
-              ),
+              .optional(),
 
           new_exact_date:
             z
               .string()
-              .optional()
-              .describe(
-                'YYYY-MM-DD only when new_date_type is exact.'
-              ),
+              .optional(),
 
           new_time:
             z
@@ -2175,9 +2548,6 @@ function createServer() {
                 /^([01]\d|2[0-3]):[0-5]\d$/
               )
               .optional()
-              .describe(
-                'Required when actions contains reschedule. New time in HH:MM format.'
-              )
         })
     },
 
@@ -2217,7 +2587,8 @@ function createServer() {
         );
       }
 
-      const steps = [];
+      const steps =
+        [];
 
       for (
         const action
@@ -2259,7 +2630,7 @@ function createServer() {
             !newDate
           ) {
             return errorResult(
-              'Reschedule date is invalid. Provide today, tomorrow, a real exact date, or check available slots first.'
+              'Reschedule date is invalid.'
             );
           }
 
@@ -2377,6 +2748,11 @@ function createServer() {
               booking.service_id
             ],
 
+          match_ids:
+            [
+              booking.service_id
+            ],
+
           touched_booking_id:
             booking.booking_id
         }
@@ -2397,16 +2773,26 @@ function createServer() {
     'search_products',
     {
       description:
-  'ALWAYS call this tool for questions about salon retail products, product names, colors, categories, prices, recommendations, cheaper alternatives, or what products are available. IMPORTANT: preserve distinguishing words from the user request. For example, if the user says "черный лак", pass query="черный лак"; if the user says "золотой лак", pass query="золотой лак". Never shorten a specific request to just "лак". Leave query empty only for the full catalog. For a specific stock question, check_product_stock may be used directly with product_query. Do not answer current product catalog or price questions from memory when this tool is available.',
+        'ALWAYS call this tool for every current salon-product question about catalog, product names, colors, type, body area, prices, recommendations, or availability. ALWAYS make a fresh call, even if the same question was asked before. CRITICAL: copy the user CURRENT request faithfully into user_request and preserve qualifiers. "крем" means all creams; "крем для рук" means only hand cream; "крем для ног" means only foot cream; "крем для лица" must return no match because the catalog has no face cream. "лак" means all polishes; "черный лак" means only the black Azature product; "желтый лак" and "золотой лак" mean only the gold Models product; nonexistent colors must return no matches. Never shorten "для ног", "для рук", "черный", "желтый", "золотой", or a specific product name to a generic category.',
 
       inputSchema:
         z.object({
+          user_request:
+            z
+              .string()
+              .min(
+                1
+              )
+              .describe(
+                'Copy the user CURRENT product request as literally as possible. Preserve product type, color, body area, brand/name, and qualifiers such as для рук, для ног, для лица, черный, желтый, золотой. Do not generalize.'
+              ),
+
           query:
             z
               .string()
               .optional()
               .describe(
-                'Optional product name or category, for example Азатюр, Голден Слэй, Шанель Камелия, крем для рук, крем для ног or лак. Leave empty for all products.'
+                'Optional lookup phrase. If supplied, preserve all distinguishing words. user_request is the authoritative input.'
               ),
 
           max_price_kzt:
@@ -2414,70 +2800,28 @@ function createServer() {
               .number()
               .positive()
               .optional()
-              .describe(
-                'Optional maximum price in KZT.'
-              )
         })
     },
 
     async ({
+      user_request,
       query,
       max_price_kzt
     }) => {
-      const q =
-        normalize(
-          query
+      const raw =
+        user_request ||
+        query ||
+        '';
+
+      let list =
+        findProducts(
+          raw,
+          {
+            ignoreNumbers:
+              max_price_kzt !==
+              undefined
+          }
         );
-
-      const terms =
-        meaningfulQueryTerms(
-          query
-        );
-
-      let list;
-
-      if (
-        isGenericProductQuery(
-          query
-        ) ||
-        terms.length ===
-          0
-      ) {
-        list =
-          products;
-      } else {
-        list =
-          products.filter(
-            p =>
-              productSearchText(
-                p
-              ).includes(
-                q
-              )
-          );
-
-        if (
-          list.length ===
-          0
-        ) {
-          list =
-            products.filter(
-              p => {
-                const hay =
-                  productSearchText(
-                    p
-                  );
-
-                return terms.every(
-                  term =>
-                    hay.includes(
-                      term
-                    )
-                );
-              }
-            );
-        }
-      }
 
       if (
         max_price_kzt !==
@@ -2491,20 +2835,36 @@ function createServer() {
           );
       }
 
+      const ids =
+        list.map(
+          p =>
+            p.id
+        );
+
       markUi(
         'products_found',
         'products',
         {
+          query:
+            raw,
+
+          match_ids:
+            ids,
+
           product_ids:
-            list.map(
-              p => p.id
-            )
+            ids
         }
       );
 
       return textResult({
+        query_received:
+          raw,
+
         currency:
           'KZT',
+
+        count:
+          list.length,
 
         products:
           list
@@ -2516,41 +2876,153 @@ function createServer() {
     'check_product_stock',
     {
       description:
-        'ALWAYS call this tool when the user asks whether a specific salon product is in stock, available, sold out, how many units remain, or asks for the current stock of a specific product. You may pass either product_id or a natural product_query such as Азатюр, Голден Слэй, Шанель Камелия, Ла Перди or Сислей Фут. Do not require a separate search_products call first when the product can be identified directly.',
+        'ALWAYS call this tool when the user asks whether a specific product is in stock, sold out, available, or how many units remain. Make a fresh call every time. Preserve the exact distinguishing words from the current user request. If the request is generic or could match multiple products, use search_products instead. Nonexistent products, colors, or body areas must produce no highlighted product.',
 
       inputSchema:
         z.object({
+          user_request:
+            z
+              .string()
+              .min(
+                1
+              )
+              .describe(
+                'Copy the user CURRENT stock question faithfully, preserving color, body area, brand/name, and product type.'
+              ),
+
           product_id:
             z
               .string()
-              .optional()
-              .describe(
-                'Optional product id from search_products.'
-              ),
+              .optional(),
 
           product_query:
             z
               .string()
               .optional()
               .describe(
-                'Optional natural product name or query when product_id is not known, for example Азатюр, Голден Слэй, Шанель Камелия, крем для рук or крем для ног.'
+                'Specific product phrase only. Never shorten a specific phrase such as крем для ног or черный лак.'
               )
         })
     },
 
     async ({
+      user_request,
       product_id,
       product_query
     }) => {
-      const resolved =
-        resolveProductReference(
-          product_id,
-          product_query
-        );
+      const raw =
+        user_request ||
+        product_query ||
+        product_id ||
+        '';
+
+      let resolved;
+
+      const specificTerms =
+        meaningfulQueryTerms(
+          raw
+        )
+          .filter(
+            term =>
+              !/^\d+$/.test(
+                term
+              )
+          );
+
+      if (
+        specificTerms.length >
+        0
+      ) {
+        const candidates =
+          findProducts(
+            raw
+          );
+
+        if (
+          candidates.length ===
+          1
+        ) {
+          resolved = {
+            product:
+              candidates[0]
+          };
+        } else if (
+          candidates.length >
+          1
+        ) {
+          const ids =
+            candidates.map(
+              p =>
+                p.id
+            );
+
+          markUi(
+            'product_stock_checked',
+            'products',
+            {
+              query:
+                raw,
+
+              match_ids:
+                ids,
+
+              product_ids:
+                ids
+            }
+          );
+
+          return errorResult(
+            'The request matches multiple products. Use search_products for a category or specify one product.'
+          );
+        } else {
+          resolved = {
+            error:
+              'No product matched "' +
+              raw +
+              '".'
+          };
+        }
+      } else if (
+        product_id
+      ) {
+        resolved =
+          resolveProductReference(
+            product_id,
+            null
+          );
+      } else if (
+        product_query
+      ) {
+        resolved =
+          resolveProductReference(
+            null,
+            product_query
+          );
+      } else {
+        resolved = {
+          error:
+            'No specific product was provided.'
+        };
+      }
 
       if (
         resolved.error
       ) {
+        markUi(
+          'product_stock_checked',
+          'products',
+          {
+            query:
+              raw,
+
+            match_ids:
+              [],
+
+            product_ids:
+              []
+          }
+        );
+
         return errorResult(
           resolved.error
         );
@@ -2563,6 +3035,14 @@ function createServer() {
         'product_stock_checked',
         'products',
         {
+          query:
+            raw,
+
+          match_ids:
+            [
+              product.id
+            ],
+
           product_ids:
             [
               product.id
@@ -2571,6 +3051,9 @@ function createServer() {
       );
 
       return textResult({
+        query_received:
+          raw,
+
         ...product,
 
         in_stock:
@@ -3209,17 +3692,6 @@ body{
     rgba(112,242,140,.22);
 }
 
-.status.cancelled{
-  color:#ffc0c5;
-
-  background:
-    rgba(209,52,65,.16);
-
-  border:
-    1px solid
-    rgba(255,106,116,.24);
-}
-
 .stock{
   margin-top:5px;
   display:inline-block;
@@ -3318,7 +3790,8 @@ body{
   }
 
   .grid{
-    grid-template-columns:1fr;
+    grid-template-columns:
+      1fr;
   }
 
   .products-panel{
@@ -3326,7 +3799,8 @@ body{
   }
 
   .products-panel .list{
-    grid-template-columns:1fr;
+    grid-template-columns:
+      1fr;
   }
 
   .slots{
@@ -3392,11 +3866,7 @@ body{
     >
 
       <div class="panel-title">
-
-        <h2>
-          УСЛУГИ
-        </h2>
-
+        <h2>УСЛУГИ</h2>
       </div>
 
       <div
@@ -3441,11 +3911,7 @@ body{
       >
 
         <div class="panel-title">
-
-          <h2>
-            ЗАПИСЬ КЛИЕНТА
-          </h2>
-
+          <h2>ЗАПИСЬ КЛИЕНТА</h2>
         </div>
 
         <div
@@ -3462,11 +3928,7 @@ body{
     >
 
       <div class="panel-title">
-
-        <h2>
-          ТОВАРЫ
-        </h2>
-
+        <h2>ТОВАРЫ</h2>
       </div>
 
       <div
@@ -3496,7 +3958,12 @@ body{
 
 <script>
 
-function esc(value) {
+const UI_FLASH_MS =
+  ${UI_FLASH_MS};
+
+function esc(
+  value
+) {
   return String(
     value ??
     ''
@@ -3523,7 +3990,9 @@ function esc(value) {
     );
 }
 
-function money(value) {
+function money(
+  value
+) {
   return new Intl
     .NumberFormat(
       'ru-RU'
@@ -3539,19 +4008,19 @@ function serviceIcon(
 ) {
   const images = {
     'manicure-classic':
-      '/images/service_millionaire.png?v=170',
+      '/images/service_millionaire.png?v=180',
 
     'manicure-gel':
-      '/images/service_ex_tears.png?v=170',
+      '/images/service_ex_tears.png?v=180',
 
     'pedicure-classic':
-      '/images/service_brutal.png?v=170',
+      '/images/service_brutal.png?v=180',
 
     'pedicure-gel':
-      '/images/service_sandals.png?v=170',
+      '/images/service_sandals.png?v=180',
 
     'nail-design':
-      '/images/service_full_meat.png?v=170'
+      '/images/service_full_meat.png?v=180'
   };
 
   const src =
@@ -3560,7 +4029,9 @@ function serviceIcon(
 
   return (
     '<img src="' +
-    esc(src) +
+    esc(
+      src
+    ) +
     '" alt="" loading="eager" decoding="async">'
   );
 }
@@ -3570,19 +4041,19 @@ function productIcon(
 ) {
   const images = {
     'lak-red-01':
-      '/images/product_azature.png?v=170',
+      '/images/product_azature.png?v=180',
 
     'lak-red-02':
-      '/images/product_models.png?v=170',
+      '/images/product_models.png?v=180',
 
     'oil-cuticle-01':
-      '/images/product_chanel.png?v=170',
+      '/images/product_chanel.png?v=180',
 
     'cream-hand-01':
-      '/images/product_laprairie.png?v=170',
+      '/images/product_laprairie.png?v=180',
 
     'base-strong-01':
-      '/images/product_sisley.png?v=170'
+      '/images/product_sisley.png?v=180'
   };
 
   const src =
@@ -3591,7 +4062,9 @@ function productIcon(
 
   return (
     '<img src="' +
-    esc(src) +
+    esc(
+      src
+    ) +
     '" alt="" loading="eager" decoding="async">'
   );
 }
@@ -3625,9 +4098,6 @@ function humanDate(
     parts[0]
   );
 }
-
-const UI_FLASH_MS =
-  7000;
 
 const DATE_ACTIONS =
   new Set([
@@ -3680,6 +4150,15 @@ function syncUiAction(
         : 0
     );
 
+  const lastAt =
+    ui &&
+    ui.last_action_at
+      ? new Date(
+          ui.last_action_at
+        )
+          .getTime()
+      : 0;
+
   if (
     !uiTrackerReady
   ) {
@@ -3688,6 +4167,28 @@ function syncUiAction(
 
     uiTrackerReady =
       true;
+
+    if (
+      lastAt &&
+      Date.now() -
+        lastAt <
+        UI_FLASH_MS
+    ) {
+      uiFlashUntil =
+        lastAt +
+        UI_FLASH_MS;
+
+      if (
+        ui.selected_date &&
+        DATE_ACTIONS.has(
+          ui.last_action
+        )
+      ) {
+        dateFlashUntil =
+          lastAt +
+          UI_FLASH_MS;
+      }
+    }
 
     return;
   }
@@ -3744,9 +4245,11 @@ function actionIsFresh(
   ui
 ) {
   return (
-    Boolean(ui) &&
+    Boolean(
+      ui
+    ) &&
     Date.now() <
-    uiFlashUntil
+      uiFlashUntil
   );
 }
 
@@ -3759,7 +4262,9 @@ function setGlow(
     'bookingPanel',
     'productsPanel'
   ].forEach(
-    function(id) {
+    function(
+      id
+    ) {
       document
         .getElementById(
           id
@@ -3823,15 +4328,15 @@ function renderServices(
     .innerHTML =
     data.services
       .map(
-        function(item) {
+        function(
+          item
+        ) {
           const highlighted =
             data.ui &&
             Array.isArray(
-              data.ui
-                .service_ids
+              data.ui.service_ids
             ) &&
-            data.ui
-              .service_ids
+            data.ui.service_ids
               .includes(
                 item.id
               ) &&
@@ -3880,7 +4385,9 @@ function renderServices(
           );
         }
       )
-      .join('');
+      .join(
+        ''
+      );
 }
 
 function renderSlots(
@@ -3927,7 +4434,9 @@ function renderSlots(
     .innerHTML =
     data.slots
       .map(
-        function(slot) {
+        function(
+          slot
+        ) {
           const key =
             data.display_date +
             '|' +
@@ -4006,7 +4515,9 @@ function renderSlots(
           );
         }
       )
-      .join('');
+      .join(
+        ''
+      );
 }
 
 function renderBooking(
@@ -4019,17 +4530,21 @@ function renderBooking(
       );
 
   const latest =
-  data.bookings &&
-  data.bookings.length
-    ? data.bookings.find(
-        function(item) {
-          return (
-            item.status ===
-            'confirmed'
-          );
-        }
-      ) || null
-    : null;
+    data.bookings &&
+    data.bookings.length
+      ? data.bookings
+          .find(
+            function(
+              item
+            ) {
+              return (
+                item.status ===
+                'confirmed'
+              );
+            }
+          ) ||
+        null
+      : null;
 
   if (
     !latest
@@ -4042,18 +4557,6 @@ function renderBooking(
 
     return;
   }
-
-  const statusClass =
-    latest.status ===
-      'cancelled'
-      ? 'cancelled'
-      : 'confirmed';
-
-  const statusText =
-    latest.status ===
-      'cancelled'
-      ? 'Отменено'
-      : 'Подтверждено';
 
   root.innerHTML =
     '<div class="booking-card">' +
@@ -4109,10 +4612,8 @@ function renderBooking(
 
     '</div>' +
 
-    '<div class="status ' +
-    statusClass +
-    '">' +
-    statusText +
+    '<div class="status confirmed">' +
+    'Подтверждено' +
     '</div>' +
 
     '</div>' +
@@ -4139,7 +4640,9 @@ function renderProducts(
     .innerHTML =
     data.products
       .map(
-        function(item) {
+        function(
+          item
+        ) {
           const highlightClass =
             data.ui &&
             data.ui.focus ===
@@ -4233,7 +4736,9 @@ function renderProducts(
           );
         }
       )
-      .join('');
+      .join(
+        ''
+      );
 }
 
 let busy =
@@ -4344,25 +4849,25 @@ const DEMO_SCREEN_HTML =
     `
 <style>
 
-  html,
-  body {
-    background:
-      transparent
-      !important;
-  }
+html,
+body{
+  background:
+    transparent
+    !important;
+}
 
-  body {
-    padding:
-      14px
-      !important;
-  }
+body{
+  padding:
+    14px
+    !important;
+}
 
-  .shell {
-    filter:
-      saturate(1.35)
-      contrast(1.12)
-      brightness(0.90);
-  }
+.shell{
+  filter:
+    saturate(1.35)
+    contrast(1.12)
+    brightness(0.90);
+}
 
 </style>
 
@@ -4415,7 +4920,7 @@ app.get(
       'Yeti Nail Studio MCP Demo',
 
     version:
-      '1.7.0',
+      VERSION,
 
     mcp_endpoint:
       '/mcp',
@@ -4522,6 +5027,7 @@ app.get(
         'service_brutal.png',
         'service_sandals.png',
         'service_full_meat.png',
+
         'product_azature.png',
         'product_models.png',
         'product_chanel.png',
@@ -4542,7 +5048,9 @@ app.get(
       )
     ) {
       return reply
-        .code(404)
+        .code(
+          404
+        )
         .send(
           'Not found'
         );
@@ -4554,6 +5062,7 @@ app.get(
           new URL(
             './public/images/' +
             filename,
+
             import.meta.url
           )
         );
@@ -4579,7 +5088,9 @@ app.get(
         );
 
       return reply
-        .code(404)
+        .code(
+          404
+        )
         .send(
           'Not found'
         );
@@ -4653,6 +5164,8 @@ await app.listen({
 });
 
 console.log(
-  'Yeti Nail Studio MCP v1.7.0 running on port ' +
+  'Yeti Nail Studio MCP v' +
+  VERSION +
+  ' running on port ' +
   port
 );
